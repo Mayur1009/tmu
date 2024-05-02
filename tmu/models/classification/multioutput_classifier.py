@@ -25,7 +25,7 @@ from tqdm import tqdm
 import numpy as np
 
 
-class TMCoalescedClassifier(TMBaseModel, SingleClauseBankMixin, MultiWeightBankMixin):
+class TMCoalesceMultiOuputClassifier(TMBaseModel, SingleClauseBankMixin, MultiWeightBankMixin):
     def __init__(
         self,
         number_of_clauses,
