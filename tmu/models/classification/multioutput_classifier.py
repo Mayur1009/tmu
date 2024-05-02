@@ -21,6 +21,7 @@ import typing
 from tmu.models.base import MultiWeightBankMixin, SingleClauseBankMixin, TMBaseModel
 from tmu.util.encoded_data_cache import DataEncoderCache
 from tmu.weight_bank import WeightBank
+from tqdm import tqdm
 import numpy as np
 
 
@@ -213,7 +214,7 @@ class TMCoalescedClassifier(TMBaseModel, SingleClauseBankMixin, MultiWeightBankM
 
             self.weight_banks[c].decrement(clause_output=clause_outputs, update_p=update_p, clause_active=self.clause_active, negative_weights=True)
 
-    def fit(self, X, Y, shuffle=True, **kwargs):
+    def fit(self, X, Y, shuffle=True, progress_bar=False, **kwargs):
         self.init(X, Y)
 
         encoded_X_train = self.train_encoder_cache.get_encoded_data(X, encoder_func=lambda x: self.clause_bank.prepare_X(X))
@@ -246,9 +247,15 @@ class TMCoalescedClassifier(TMBaseModel, SingleClauseBankMixin, MultiWeightBankM
         if shuffle:
             self.rng.shuffle(shuffled_index)
 
-        for e in shuffled_index:
-            for c in range(self.number_of_classes):
-                self.update(c, e, Ym[e, c], encoded_X_train)
+        if progress_bar:
+            for e in tqdm(shuffled_index):
+                for c in range(self.number_of_classes):
+                    self.update(c, e, Ym[e, c], encoded_X_train)
+
+        else:
+            for e in shuffled_index:
+                for c in range(self.number_of_classes):
+                    self.update(c, e, Ym[e, c], encoded_X_train)
 
         # class_observed = np.zeros(self.number_of_classes, dtype=np.uint32)
         # example_indexes = np.zeros(self.number_of_classes, dtype=np.uint32)
@@ -272,16 +279,21 @@ class TMCoalescedClassifier(TMBaseModel, SingleClauseBankMixin, MultiWeightBankM
         #             self.update(Ym[batch_example], batch_example, encoded_X_train)
         return
 
-    def predict(self, X, clip_class_sum=False, return_class_sums: bool = False, **kwargs):
+    def predict(self, X, clip_class_sum=False, return_class_sums: bool = False, progress_bar=False, **kwargs):
         # Caching the encoded test set if it's not cached already
         if not np.array_equal(self.X_test, X):
             self.encoded_X_test = self.clause_bank.prepare_X(X)
             self.X_test = X.copy()
 
         # Compute class sums for all samples
-        class_sums = np.array(
-            [self.compute_class_sums(encoded_X_test=self.encoded_X_test, ith_sample=e, clip_class_sum=clip_class_sum) for e in range(X.shape[0])]
-        )
+        if progress_bar:
+            class_sums = np.array(
+                [self.compute_class_sums(encoded_X_test=self.encoded_X_test, ith_sample=e, clip_class_sum=clip_class_sum) for e in tqdm(range(X.shape[0]))]
+            )
+        else:
+            class_sums = np.array(
+                [self.compute_class_sums(encoded_X_test=self.encoded_X_test, ith_sample=e, clip_class_sum=clip_class_sum) for e in range(X.shape[0])]
+            )
 
         # Find the class with the maximum sum for each sample
         # max_classes = np.argmax(class_sums, axis=1)
