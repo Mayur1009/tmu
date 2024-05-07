@@ -100,6 +100,7 @@ class TMCoalesceMultiOuputClassifier(TMBaseModel, SingleClauseBankMixin, MultiWe
         if self.max_positive_clauses is None:
             self.max_positive_clauses = self.number_of_clauses
 
+
     # Update function for multioutput classifier
     def update(self, c, e, y, encoded_X_train):
         """
@@ -133,8 +134,8 @@ class TMCoalesceMultiOuputClassifier(TMBaseModel, SingleClauseBankMixin, MultiWe
                 e=e,
             )
 
-            # if (self.weight_banks[target].get_weights() >= 0).sum() < self.max_positive_clauses:
-            self.weight_banks[c].increment(clause_output=clause_outputs, update_p=update_p, clause_active=self.clause_active, positive_weights=True)
+            if self.weighted_clauses and (self.weight_banks[c].get_weights() >= 0).sum() < self.max_positive_clauses:
+                self.weight_banks[c].increment(clause_output=clause_outputs, update_p=update_p, clause_active=self.clause_active, positive_weights=True)
 
             if self.type_iii_feedback and type_iii_feedback_selection == 0:
                 self.clause_bank.type_iii_feedback(
@@ -193,6 +194,9 @@ class TMCoalesceMultiOuputClassifier(TMBaseModel, SingleClauseBankMixin, MultiWe
                 e=e,
             )
 
+            if self.weighted_clauses:
+                self.weight_banks[c].decrement(clause_output=clause_outputs, update_p=update_p, clause_active=self.clause_active, negative_weights=True)
+
             if self.type_iii_feedback and type_iii_feedback_selection == 1:
                 self.clause_bank.type_iii_feedback(
                     update_p=update_p,
@@ -211,8 +215,6 @@ class TMCoalesceMultiOuputClassifier(TMBaseModel, SingleClauseBankMixin, MultiWe
                     e=e,
                     target=0,
                 )
-
-            self.weight_banks[c].decrement(clause_output=clause_outputs, update_p=update_p, clause_active=self.clause_active, negative_weights=True)
 
     def fit(self, X, Y, shuffle=True, progress_bar=False, **kwargs):
         self.init(X, Y)
@@ -281,19 +283,14 @@ class TMCoalesceMultiOuputClassifier(TMBaseModel, SingleClauseBankMixin, MultiWe
 
     def predict(self, X, clip_class_sum=False, return_class_sums: bool = False, progress_bar=False, **kwargs):
         # Caching the encoded test set if it's not cached already
-        if not np.array_equal(self.X_test, X):
-            self.encoded_X_test = self.clause_bank.prepare_X(X)
-            self.X_test = X.copy()
+        # if not np.array_equal(self.X_test, X):
+        #     self.encoded_X_test = self.clause_bank.prepare_X(X)
+        #     self.X_test = X.copy()
+        encoded_X_test = self.clause_bank.prepare_X(X)
 
+        pbar = tqdm(range(X.shape[0])) if progress_bar else range(X.shape[0])
         # Compute class sums for all samples
-        if progress_bar:
-            class_sums = np.array(
-                [self.compute_class_sums(encoded_X_test=self.encoded_X_test, ith_sample=e, clip_class_sum=clip_class_sum) for e in tqdm(range(X.shape[0]))]
-            )
-        else:
-            class_sums = np.array(
-                [self.compute_class_sums(encoded_X_test=self.encoded_X_test, ith_sample=e, clip_class_sum=clip_class_sum) for e in range(X.shape[0])]
-            )
+        class_sums = np.array([self.compute_class_sums(encoded_X_test=encoded_X_test, ith_sample=e, clip_class_sum=clip_class_sum) for e in pbar])
 
         # Find the class with the maximum sum for each sample
         # max_classes = np.argmax(class_sums, axis=1)
@@ -304,7 +301,7 @@ class TMCoalesceMultiOuputClassifier(TMBaseModel, SingleClauseBankMixin, MultiWe
         else:
             return output
 
-    def compute_class_sums(self, encoded_X_test: np.array, ith_sample: int, clip_class_sum: bool) -> typing.List[int]:
+    def compute_class_sums(self, encoded_X_test: np.ndarray, ith_sample: int, clip_class_sum: bool) -> typing.List[int]:
         """The following function evaluates the resulting class sum votes.
 
         Args:
