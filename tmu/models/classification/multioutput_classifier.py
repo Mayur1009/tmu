@@ -283,18 +283,21 @@ class TMCoalesceMultiOuputClassifier(TMBaseModel, SingleClauseBankMixin, MultiWe
 
                 else:
                     self.update_ps[c] = 1.0 * (self.T + class_sum) / (2 * self.T)
+
+                if self.update_ps[c] > 0:
                     neg_classes.append(c)
 
             if self.update_ps.sum() == 0:
                 continue
 
+
             if self.focused_negative_sampling:
                 not_target = self.rng.choice(self.number_of_classes, p=self.update_ps / self.update_ps.sum())
                 update_p = self.update_ps[not_target]
             else:
-                not_target = self.rng.randint(neg_classes)
+                not_target = self.rng.choice(neg_classes)
                 update_p = self.update_ps[not_target]
-                assert update_p != 0, "myassert: neg_classes not working, update_p became 0."
+                assert update_p != 0.0, "myassert: neg_classes not working, update_p became 0."
 
             self.clause_bank.type_i_feedback(
                 update_p=update_p * self.type_i_p,
