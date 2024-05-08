@@ -29,8 +29,8 @@ if __name__ == "__main__":
     xtrain, xtest, ytrain, ytest = get_data()
 
     tm = TMCoalesceMultiOuputClassifier(
-        number_of_clauses=2000,
-        T=4000,
+        number_of_clauses=2500,
+        T=3125,
         s=10.0,
         patch_dim=(10, 10),
     )
@@ -46,4 +46,5 @@ if __name__ == "__main__":
         acc = accuracy_score(ytest, pred)
         class_report = classification_report(ytest, pred)
 
+        print(f"{acc=}")
         print(class_report)

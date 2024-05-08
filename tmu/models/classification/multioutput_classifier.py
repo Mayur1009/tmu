@@ -100,7 +100,6 @@ class TMCoalesceMultiOuputClassifier(TMBaseModel, SingleClauseBankMixin, MultiWe
         if self.max_positive_clauses is None:
             self.max_positive_clauses = self.number_of_clauses
 
-
     # Update function for multioutput classifier
     def update(self, c, e, y, encoded_X_train):
         """
@@ -177,7 +176,7 @@ class TMCoalesceMultiOuputClassifier(TMBaseModel, SingleClauseBankMixin, MultiWe
         #     update_p = self.update_ps[not_target]
 
         if y == 0:
-            update_p = (self.T + class_sum) / (2 * self.T)
+            update_p = (-self.T - class_sum) / (2 * self.T)
             self.clause_bank.type_i_feedback(
                 update_p=update_p * self.type_i_p,
                 clause_active=self.clause_active * (self.weight_banks[c].get_weights() < 0),
@@ -249,36 +248,72 @@ class TMCoalesceMultiOuputClassifier(TMBaseModel, SingleClauseBankMixin, MultiWe
         if shuffle:
             self.rng.shuffle(shuffled_index)
 
-        if progress_bar:
-            for e in tqdm(shuffled_index):
-                for c in range(self.number_of_classes):
-                    self.update(c, e, Ym[e, c], encoded_X_train)
+        pbar = tqdm(shuffled_index) if progress_bar else shuffled_index
 
-        else:
-            for e in shuffled_index:
-                for c in range(self.number_of_classes):
-                    self.update(c, e, Ym[e, c], encoded_X_train)
+        for e in pbar:
+            clause_outputs = self.clause_bank.calculate_clause_outputs_update(self.literal_active, encoded_X_train, e)
+            neg_classes = []
+            for c in range(self.number_of_classes):
+                class_sum = np.dot(self.clause_active * self.weight_banks[c].get_weights(), clause_outputs).astype(np.int32)
+                class_sum = np.clip(class_sum, -self.T, self.T)
 
-        # class_observed = np.zeros(self.number_of_classes, dtype=np.uint32)
-        # example_indexes = np.zeros(self.number_of_classes, dtype=np.uint32)
-        # example_counter = 0
-        # for e in shuffled_index:
-        #     if self.output_balancing:
-        #         if class_observed[Ym[e]] == 0:
-        #             example_indexes[Ym[e]] = e
-        #             class_observed[Ym[e]] = 1
-        #             example_counter += 1
-        #     else:
-        #         example_indexes[example_counter] = e
-        #         example_counter += 1
-        #
-        #     if example_counter == self.number_of_classes:
-        #         example_counter = 0
-        #
-        #         for i in range(self.number_of_classes):
-        #             class_observed[i] = 0
-        #             batch_example = example_indexes[i]
-        #             self.update(Ym[batch_example], batch_example, encoded_X_train)
+                if Ym[e, c] == 1:
+                    update_p = (self.T - class_sum) / (2 * self.T)
+
+                    self.clause_bank.type_i_feedback(
+                        update_p=update_p * self.type_i_p,
+                        clause_active=self.clause_active * (self.weight_banks[c].get_weights() >= 0),
+                        literal_active=self.literal_active,
+                        encoded_X=encoded_X_train,
+                        e=e,
+                    )
+
+                    self.clause_bank.type_ii_feedback(
+                        update_p=update_p * self.type_ii_p,
+                        clause_active=self.clause_active * (self.weight_banks[c].get_weights() < 0),
+                        literal_active=self.literal_active,
+                        encoded_X=encoded_X_train,
+                        e=e,
+                    )
+
+                    if (self.weight_banks[c].get_weights() >= 0).sum() < self.max_positive_clauses:
+                        self.weight_banks[c].increment(clause_output=clause_outputs, update_p=update_p, clause_active=self.clause_active, positive_weights=True)
+
+                    self.update_ps[c] = 0.0
+
+                else:
+                    self.update_ps[c] = 1.0 * (self.T + class_sum) / (2 * self.T)
+                    neg_classes.append(c)
+
+            if self.update_ps.sum() == 0:
+                continue
+
+            if self.focused_negative_sampling:
+                not_target = self.rng.choice(self.number_of_classes, p=self.update_ps / self.update_ps.sum())
+                update_p = self.update_ps[not_target]
+            else:
+                not_target = self.rng.randint(neg_classes)
+                update_p = self.update_ps[not_target]
+                assert update_p != 0, "myassert: neg_classes not working, update_p became 0."
+
+            self.clause_bank.type_i_feedback(
+                update_p=update_p * self.type_i_p,
+                clause_active=self.clause_active * (self.weight_banks[not_target].get_weights() < 0),
+                literal_active=self.literal_active,
+                encoded_X=encoded_X_train,
+                e=e,
+            )
+
+            self.clause_bank.type_ii_feedback(
+                update_p=update_p * self.type_ii_p,
+                clause_active=self.clause_active * (self.weight_banks[not_target].get_weights() >= 0),
+                literal_active=self.literal_active,
+                encoded_X=encoded_X_train,
+                e=e,
+            )
+
+            self.weight_banks[not_target].decrement(clause_output=clause_outputs, update_p=update_p, clause_active=self.clause_active, negative_weights=True)
+
         return
 
     def predict(self, X, clip_class_sum=False, return_class_sums: bool = False, progress_bar=False, **kwargs):
