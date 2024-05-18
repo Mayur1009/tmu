@@ -359,7 +359,9 @@ class TMCoalesceMultiOuputClassifier(TMBaseModel, SingleClauseBankMixin, MultiWe
         return class_sums
 
     def to_cpu(self, X):
-        """ TODO: Convert GPU clause bank to CPU."""
+        """Convert GPU clause bank to CPU."""
+        # WARN: not completely tested. May cause problems.
+        # TODO: Testing
 
         if self.platform in ["GPU", "CUDA"]:
             clause_bank_gpu = self.clause_bank
