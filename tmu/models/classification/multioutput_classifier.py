@@ -290,7 +290,6 @@ class TMCoalesceMultiOuputClassifier(TMBaseModel, SingleClauseBankMixin, MultiWe
             if self.update_ps.sum() == 0:
                 continue
 
-
             if self.focused_negative_sampling:
                 not_target = self.rng.choice(self.number_of_classes, p=self.update_ps / self.update_ps.sum())
                 update_p = self.update_ps[not_target]
@@ -339,7 +338,7 @@ class TMCoalesceMultiOuputClassifier(TMBaseModel, SingleClauseBankMixin, MultiWe
         else:
             return output
 
-    def compute_class_sums(self, encoded_X_test: np.ndarray, ith_sample: int, clip_class_sum: bool) -> typing.List[int]:
+    def compute_class_sums(self, encoded_X_test, ith_sample: int, clip_class_sum: bool) -> typing.List[int]:
         """The following function evaluates the resulting class sum votes.
 
         Args:
@@ -358,6 +357,25 @@ class TMCoalesceMultiOuputClassifier(TMBaseModel, SingleClauseBankMixin, MultiWe
                 class_sum = np.clip(class_sum, -self.T, self.T)
             class_sums.append(class_sum)
         return class_sums
+
+    def to_cpu(self, X):
+        """ TODO: Convert GPU clause bank to CPU."""
+
+        if self.platform in ["GPU", "CUDA"]:
+            clause_bank_gpu = self.clause_bank
+            clause_bank_gpu.synchronize_clause_bank()
+            clause_bank_type, clause_bank_args = self._build_cpu_bank(X)
+            clause_bank_cpu = clause_bank_type(**clause_bank_args)
+            clause_bank_cpu.clause_bank = np.copy(clause_bank_gpu.clause_bank)
+
+            self.clause_bank = clause_bank_cpu
+            self.platform = "CPU"
+        
+        elif self.platform == "CPU":
+            print("Already CPU....")
+
+        else:
+            print("Not implemented")
 
     """def predict(self, X, clip_class_sum=False, return_class_sums: bool = False, **kwargs):
         if not np.array_equal(self.X_test, X):
