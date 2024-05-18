@@ -363,7 +363,7 @@ class TMCoalesceMultiOuputClassifier(TMBaseModel, SingleClauseBankMixin, MultiWe
 
         if self.platform in ["GPU", "CUDA"]:
             clause_bank_gpu = self.clause_bank
-            clause_bank_gpu.synchronize_clause_bank()
+            self._profiler.profile(cuda.memcpy_dtoh, self.clause_bank, self.clause_bank_gpu)
             clause_bank_type, clause_bank_args = self._build_cpu_bank(X)
             clause_bank_cpu = clause_bank_type(**clause_bank_args)
             clause_bank_cpu.clause_bank = np.copy(clause_bank_gpu.clause_bank)
