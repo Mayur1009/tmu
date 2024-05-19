@@ -365,6 +365,7 @@ class TMCoalesceMultiOuputClassifier(TMBaseModel, SingleClauseBankMixin, MultiWe
 
         if self.platform in ["GPU", "CUDA"]:
             clause_bank_gpu = self.clause_bank
+            clause_bank_gpu.synchronize_clause_bank()
             clause_bank_type, clause_bank_args = self._build_cpu_bank(X)
             clause_bank_cpu = clause_bank_type(**clause_bank_args)
             
@@ -376,12 +377,13 @@ class TMCoalesceMultiOuputClassifier(TMBaseModel, SingleClauseBankMixin, MultiWe
 
             self.clause_bank = clause_bank_cpu
             self.platform = "CPU"
+            print("to_cpu(): Successful....")
         
         elif self.platform == "CPU":
-            print("Already CPU....")
+            print("to_cpu(): Already CPU....")
 
         else:
-            print("Not implemented")
+            print("to_cpu(): Not implemented....")
 
     """def predict(self, X, clip_class_sum=False, return_class_sums: bool = False, **kwargs):
         if not np.array_equal(self.X_test, X):
