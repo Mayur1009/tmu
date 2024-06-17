@@ -224,7 +224,8 @@ class ImplClauseBankCUDA(BaseClauseBank):
         return self.clause_output
 
     def calculate_clause_outputs_patchwise(self, encoded_X, e):
-        self.calculate_clause_outputs_patchwise.prepared_call(
+
+        self.calculate_clause_outputs_patchwise_gpu.prepared_call(
             self.grid,
             self.block,
             self.clause_bank_gpu,
