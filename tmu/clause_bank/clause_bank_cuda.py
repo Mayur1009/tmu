@@ -219,7 +219,7 @@ class ImplClauseBankCUDA(BaseClauseBank):
         return self.clause_output
 
     def calculate_clause_outputs_patchwise(self, encoded_X, e):
-        xi_p = ffi.cast("unsigned int *", Xi.ctypes.data)
+        xi_p = ffi.cast("unsigned int *", encoded_X.ctypes.data)
         lib.cb_calculate_clause_outputs_patchwise(
             self.cb_p,
             self.number_of_clauses,
