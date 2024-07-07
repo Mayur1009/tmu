@@ -87,10 +87,11 @@ class TMCoalesceMultiOuputClassifier(TMBaseModel, SingleClauseBankMixin, MultiWe
         self.clause_bank = clause_bank_type(**clause_bank_args)
 
     def init_weight_bank(self, X: np.ndarray, Y: np.ndarray):
-        # self.number_of_classes = int(np.max(Y) + 1)
-        # Set number of classes
         self.number_of_classes = Y.shape[1]
-        self.weight_banks.set_clause_init(WeightBank, dict(weights=self.rng.choice([-1, 1], size=self.number_of_clauses).astype(np.int32)))
+        self.weight_banks.set_clause_init(
+            WeightBank,
+            dict(weights=self.rng.choice([-1, 1], size=self.number_of_clauses).astype(np.int32)),
+        )
         self.weight_banks.populate(list(range(self.number_of_classes)))
 
     def init_after(self, X: np.ndarray, Y: np.ndarray):
@@ -99,121 +100,6 @@ class TMCoalesceMultiOuputClassifier(TMBaseModel, SingleClauseBankMixin, MultiWe
 
         if self.max_positive_clauses is None:
             self.max_positive_clauses = self.number_of_clauses
-
-    # Update function for multioutput classifier
-    def update(self, c, e, y, encoded_X_train):
-        """
-        c: class index
-        e: example index
-        y: class output for training sample X[e], 0 or 1
-        encoded_X_train: training samples
-        """
-        clause_outputs = self.clause_bank.calculate_clause_outputs_update(self.literal_active, encoded_X_train, e)
-
-        class_sum = np.dot(self.clause_active * self.weight_banks[c].get_weights(), clause_outputs).astype(np.int32)
-        class_sum = np.clip(class_sum, -self.T, self.T)
-
-        type_iii_feedback_selection = self.rng.choice(2)
-
-        if y == 1:
-            update_p = (self.T - class_sum) / (2 * self.T)
-            self.clause_bank.type_i_feedback(
-                update_p=update_p * self.type_i_p,
-                clause_active=self.clause_active * (self.weight_banks[c].get_weights() >= 0),
-                literal_active=self.literal_active,
-                encoded_X=encoded_X_train,
-                e=e,
-            )
-
-            self.clause_bank.type_ii_feedback(
-                update_p=update_p * self.type_ii_p,
-                clause_active=self.clause_active * (self.weight_banks[c].get_weights() < 0),
-                literal_active=self.literal_active,
-                encoded_X=encoded_X_train,
-                e=e,
-            )
-
-            if self.weighted_clauses and (self.weight_banks[c].get_weights() >= 0).sum() < self.max_positive_clauses:
-                self.weight_banks[c].increment(clause_output=clause_outputs, update_p=update_p, clause_active=self.clause_active, positive_weights=True)
-
-            if self.type_iii_feedback and type_iii_feedback_selection == 0:
-                self.clause_bank.type_iii_feedback(
-                    update_p=update_p,
-                    clause_active=self.clause_active * (self.weight_banks[c].get_weights() >= 0),
-                    literal_active=self.literal_active,
-                    encoded_X=encoded_X_train,
-                    e=e,
-                    target=1,
-                )
-
-                self.clause_bank.type_iii_feedback(
-                    update_p=update_p,
-                    clause_active=self.clause_active * (self.weight_banks[c].get_weights() < 0),
-                    literal_active=self.literal_active,
-                    encoded_X=encoded_X_train,
-                    e=e,
-                    target=0,
-                )
-
-        # for i in range(self.number_of_classes):
-        #     if i == target:
-        #         self.update_ps[i] = 0.0
-        #     else:
-        #         self.update_ps[i] = np.dot(self.clause_active * self.weight_banks[i].get_weights(), clause_outputs).astype(np.int32)
-        #         self.update_ps[i] = np.clip(self.update_ps[i], -self.T, self.T)
-        #         self.update_ps[i] = 1.0 * (self.T + self.update_ps[i]) / (2 * self.T)
-        #
-        # if self.update_ps.sum() == 0:
-        #     return
-        #
-        # if self.focused_negative_sampling:
-        #     not_target = self.rng.choice(self.number_of_classes, p=self.update_ps / self.update_ps.sum())
-        #     update_p = self.update_ps[not_target]
-        # else:
-        #     not_target = self.rng.randint(self.number_of_classes)
-        #     while not_target == target:
-        #         not_target = self.rng.randint(self.number_of_classes)
-        #     update_p = self.update_ps[not_target]
-
-        if y == 0:
-            update_p = (-self.T - class_sum) / (2 * self.T)
-            self.clause_bank.type_i_feedback(
-                update_p=update_p * self.type_i_p,
-                clause_active=self.clause_active * (self.weight_banks[c].get_weights() < 0),
-                literal_active=self.literal_active,
-                encoded_X=encoded_X_train,
-                e=e,
-            )
-
-            self.clause_bank.type_ii_feedback(
-                update_p=update_p * self.type_ii_p,
-                clause_active=self.clause_active * (self.weight_banks[c].get_weights() >= 0),
-                literal_active=self.literal_active,
-                encoded_X=encoded_X_train,
-                e=e,
-            )
-
-            if self.weighted_clauses:
-                self.weight_banks[c].decrement(clause_output=clause_outputs, update_p=update_p, clause_active=self.clause_active, negative_weights=True)
-
-            if self.type_iii_feedback and type_iii_feedback_selection == 1:
-                self.clause_bank.type_iii_feedback(
-                    update_p=update_p,
-                    clause_active=self.clause_active * (self.weight_banks[c].get_weights() < 0),
-                    literal_active=self.literal_active,
-                    encoded_X=encoded_X_train,
-                    e=e,
-                    target=1,
-                )
-
-                self.clause_bank.type_iii_feedback(
-                    update_p=update_p,
-                    clause_active=self.clause_active * (self.weight_banks[c].get_weights() >= 0),
-                    literal_active=self.literal_active,
-                    encoded_X=encoded_X_train,
-                    e=e,
-                    target=0,
-                )
 
     def fit(self, X, Y, shuffle=True, progress_bar=False, **kwargs):
         self.init(X, Y)
@@ -235,7 +121,10 @@ class TMCoalesceMultiOuputClassifier(TMBaseModel, SingleClauseBankMixin, MultiWe
                 self.literal_active[ta_chunk] |= 1 << chunk_pos
 
         if not self.feature_negation:
-            for k in range(self.clause_bank.number_of_literals // 2, self.clause_bank.number_of_literals):
+            for k in range(
+                self.clause_bank.number_of_literals // 2,
+                self.clause_bank.number_of_literals,
+            ):
                 ta_chunk = k // 32
                 chunk_pos = k % 32
                 self.literal_active[ta_chunk] &= ~(1 << chunk_pos)
@@ -250,13 +139,19 @@ class TMCoalesceMultiOuputClassifier(TMBaseModel, SingleClauseBankMixin, MultiWe
 
         pbar = tqdm(shuffled_index) if progress_bar else shuffled_index
 
+        # Combine all weight banks, to make use of faster numpy matrix operation
+        self.wcomb = np.empty((self.number_of_clauses, self.number_of_classes), dtype=np.int32)
+        for c in range(self.number_of_classes):
+            self.wcomb[:, c] = self.weight_banks[c].get_weights()
+
         for e in pbar:
             clause_outputs = self.clause_bank.calculate_clause_outputs_update(self.literal_active, encoded_X_train, e)
+            # Calculate all class sums at once, rather than in the next loop, (clause_outputs * W)
+            class_sums = (clause_outputs * self.clause_active)[np.newaxis, :] @ self.wcomb
+            class_sums = np.clip(class_sums, -self.T, self.T).astype(np.int32)
             neg_classes = []
             for c in range(self.number_of_classes):
-                class_sum = np.dot(self.clause_active * self.weight_banks[c].get_weights(), clause_outputs).astype(np.int32)
-                class_sum = np.clip(class_sum, -self.T, self.T)
-
+                class_sum = class_sums[0, c]
                 if Ym[e, c] == 1:
                     update_p = (self.T - class_sum) / (2 * self.T)
 
@@ -277,7 +172,13 @@ class TMCoalesceMultiOuputClassifier(TMBaseModel, SingleClauseBankMixin, MultiWe
                     )
 
                     if (self.weight_banks[c].get_weights() >= 0).sum() < self.max_positive_clauses:
-                        self.weight_banks[c].increment(clause_output=clause_outputs, update_p=update_p, clause_active=self.clause_active, positive_weights=True)
+                        self.weight_banks[c].increment(
+                            clause_output=clause_outputs,
+                            update_p=update_p,
+                            clause_active=self.clause_active,
+                            positive_weights=True,
+                        )
+                        self.wcomb[:, c] = self.weight_banks[c].get_weights()
 
                     self.update_ps[c] = 0.0
 
@@ -314,23 +215,36 @@ class TMCoalesceMultiOuputClassifier(TMBaseModel, SingleClauseBankMixin, MultiWe
                 e=e,
             )
 
-            self.weight_banks[not_target].decrement(clause_output=clause_outputs, update_p=update_p, clause_active=self.clause_active, negative_weights=True)
+            self.weight_banks[not_target].decrement(
+                clause_output=clause_outputs,
+                update_p=update_p,
+                clause_active=self.clause_active,
+                negative_weights=True,
+            )
+            self.wcomb[:, not_target] = self.weight_banks[not_target].get_weights()
 
         return
 
-    def predict(self, X, clip_class_sum=False, return_class_sums: bool = False, progress_bar=False, **kwargs):
-        # Caching the encoded test set if it's not cached already
-        # if not np.array_equal(self.X_test, X):
-        #     self.encoded_X_test = self.clause_bank.prepare_X(X)
-        #     self.X_test = X.copy()
+    def predict(
+        self,
+        X,
+        clip_class_sum=False,
+        return_class_sums: bool = False,
+        progress_bar=False,
+        **kwargs,
+    ):
         encoded_X_test = self.clause_bank.prepare_X(X)
 
-        pbar = tqdm(range(X.shape[0])) if progress_bar else range(X.shape[0])
-        # Compute class sums for all samples
-        class_sums = np.array([self.compute_class_sums(encoded_X_test=encoded_X_test, ith_sample=e, clip_class_sum=clip_class_sum) for e in pbar])
+        for c in range(self.number_of_classes):
+            self.wcomb[:, c] = self.weight_banks[c].get_weights()
 
-        # Find the class with the maximum sum for each sample
-        # max_classes = np.argmax(class_sums, axis=1)
+        pbar = tqdm(range(X.shape[0])) if progress_bar else range(X.shape[0])
+
+        # Compute class sums for all samples
+        class_sums = np.empty((X.shape[0], self.number_of_classes))
+        for e in pbar:
+            class_sums[e, :] = self.compute_class_sums(encoded_X_test, e, clip_class_sum)
+
         output = (class_sums >= 0).astype(np.uint32)
 
         if return_class_sums:
@@ -338,7 +252,7 @@ class TMCoalesceMultiOuputClassifier(TMBaseModel, SingleClauseBankMixin, MultiWe
         else:
             return output
 
-    def compute_class_sums(self, encoded_X_test, ith_sample: int, clip_class_sum: bool) -> typing.List[int]:
+    def compute_class_sums(self, encoded_X_test, ith_sample: int, clip_class_sum: bool):
         """The following function evaluates the resulting class sum votes.
 
         Args:
@@ -348,27 +262,19 @@ class TMCoalesceMultiOuputClassifier(TMBaseModel, SingleClauseBankMixin, MultiWe
         Returns:
             list[int]: list of all class sums
         """
-        class_sums = []
         clause_outputs = self.clause_bank.calculate_clause_outputs_predict(encoded_X_test, ith_sample)
-        for i in range(self.number_of_classes):
-            class_sum = np.dot(self.weight_banks[i].get_weights(), clause_outputs).astype(np.int32)
-
-            if clip_class_sum:
-                class_sum = np.clip(class_sum, -self.T, self.T)
-            class_sums.append(class_sum)
+        class_sums = clause_outputs[np.newaxis, :] @ self.wcomb
+        if clip_class_sum:
+            class_sums = np.clip(class_sums, -self.T, self.T).astype(np.int32)
         return class_sums
 
     def to_cpu(self, X):
-        """Convert GPU clause bank to CPU."""
-        # WARN: not completely tested. May cause problems.
-        # TODO: Testing
-
         if self.platform in ["GPU", "CUDA"]:
             clause_bank_gpu = self.clause_bank
             clause_bank_gpu.synchronize_clause_bank()
             clause_bank_type, clause_bank_args = self._build_cpu_bank(X)
             clause_bank_cpu = clause_bank_type(**clause_bank_args)
-            
+
             clause_bank_cpu.clause_bank = clause_bank_gpu.clause_bank
             clause_bank_cpu.clause_output = clause_bank_gpu.clause_output
             clause_bank_cpu.literal_clause_count = clause_bank_gpu.literal_clause_count
@@ -378,50 +284,12 @@ class TMCoalesceMultiOuputClassifier(TMBaseModel, SingleClauseBankMixin, MultiWe
             self.clause_bank = clause_bank_cpu
             self.platform = "CPU"
             print("to_cpu(): Successful....")
-        
+
         elif self.platform == "CPU":
             print("to_cpu(): Already CPU....")
 
         else:
             print("to_cpu(): Not implemented....")
-
-    """def predict(self, X, clip_class_sum=False, return_class_sums: bool = False, **kwargs):
-        if not np.array_equal(self.X_test, X):
-            self.encoded_X_test = self.clause_bank.prepare_X(X)
-            self.X_test = X.copy()
-
-        Y = np.ascontiguousarray(np.zeros(X.shape[0], dtype=np.uint32))
-
-        for e in range(X.shape[0]):
-            max_class_sum = -self.T
-            max_class = 0
-            clause_outputs = self.clause_bank.calculate_clause_outputs_predict(self.encoded_X_test, e)
-            for i in range(self.number_of_classes):
-                class_sum = np.dot(self.weight_banks[i].get_weights(), clause_outputs).astype(np.int32)
-
-                if clip_class_sum:
-                    class_sum = np.clip(class_sum, -self.T, self.T)
-
-                if class_sum > max_class_sum:
-                    max_class_sum = class_sum
-                    max_class = i
-            Y[e] = max_class
-        return Y"""
-
-    def predict_individual(self, X):
-        if not np.array_equal(self.X_test, X):
-            self.encoded_X_test = self.clause_bank.prepare_X(X)
-            self.X_test = X.copy()
-
-        Y = np.ascontiguousarray(np.zeros((X.shape[0], self.number_of_classes), dtype=np.uint32))
-
-        for e in range(X.shape[0]):
-            clause_outputs = self.clause_bank.calculate_clause_outputs_predict(self.encoded_X_test, e)
-            for i in range(self.number_of_classes):
-                class_sum = np.dot(self.weight_banks[i].get_weights(), clause_outputs).astype(np.int32)
-                class_sum = np.clip(class_sum, -self.T, self.T)
-                Y[e, i] = class_sum >= 0
-        return Y
 
     def clause_precision(self, the_class, X, Y):
         clause_outputs = self.transform(X)
