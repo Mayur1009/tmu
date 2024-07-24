@@ -51,6 +51,8 @@ tests = [
 homepage = "https://github.com/cair/tmu/"
 repository = "https://github.com/cair/tmu/"
 
+[tool.basedpyright]
+reportMissingTypeStubs = "warning"
 
 [tool.setuptools.package-dir]
 tmu = "tmu"
@@ -81,10 +83,6 @@ headers = [
 ]
 
 include_dir = "tmu/lib/include"
-
-
-[tool.ruff]
-line-length = 160
 
 
 [tool.cibuildwheel]

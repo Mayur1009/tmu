@@ -189,7 +189,7 @@ class TMBaseModel:
     def fit(self, X, Y, *args, **kwargs):
         raise NotImplementedError("fit(self, X, Y, *args, **kwargs) is not implemented for your model")
 
-    def predict(self, X, shuffle=True) -> np.ndarray:
+    def predict(self, X, shuffle=True):
         raise NotImplementedError("predict(self, X: np.ndarray")
 
     def init_clause_bank(self, X: np.ndarray, Y: np.ndarray):
