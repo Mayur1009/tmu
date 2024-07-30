@@ -144,10 +144,6 @@ class TMCoalesceMultiOuputClassifier(TMBaseModel, SingleClauseBankMixin, MultiWe
         for c in range(self.number_of_classes):
             self.wcomb[:, c] = self.weight_banks[c].get_weights()
 
-        self.number_of_pos = np.zeros(self.number_of_classes)
-        self.number_of_neg = np.zeros(self.number_of_classes)
-        self.avg_neg_selection = np.zeros(X.shape[0])
-
         for e in pbar:
             y_csr = Y_csr[e, :]
             pos_class_ind = y_csr.indices
@@ -192,7 +188,6 @@ class TMCoalesceMultiOuputClassifier(TMBaseModel, SingleClauseBankMixin, MultiWe
                         self.wcomb[:, c] = self.weight_banks[c].get_weights()
 
                     self.update_ps[c] = 0.0
-                    self.number_of_pos[c] += 1
 
                 else:
                     if update_p and self.rng.uniform() <= (self.q / max(1, self.number_of_classes - 1)):
@@ -220,8 +215,6 @@ class TMCoalesceMultiOuputClassifier(TMBaseModel, SingleClauseBankMixin, MultiWe
                         )
                         self.wcomb[:, c] = self.weight_banks[c].get_weights()
                         self.update_ps[c] = 0.0
-                        self.number_of_neg[c] += 1
-                        self.avg_neg_selection[e] += 1
 
             # for c in pos_class_ind:
             #     self.clause_bank.type_i_feedback(
@@ -294,10 +287,6 @@ class TMCoalesceMultiOuputClassifier(TMBaseModel, SingleClauseBankMixin, MultiWe
             # )
             # self.wcomb[:, not_target] = self.weight_banks[not_target].get_weights()
 
-        print(f"{self.number_of_pos=}")
-        print(f"{self.number_of_neg=}")
-        print(f"{self.avg_neg_selection=}")
-        print(f"{self.avg_neg_selection.mean()=}")
         return
 
     def predict(
