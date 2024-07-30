@@ -4,9 +4,9 @@ from pprint import pprint
 
 import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.metrics import accuracy_score, classification_report, f1_score, hamming_loss, precision_score, recall_score
+from sklearn.metrics import  classification_report
 from tmu.data import MNIST
-from tmu.models.classification.multioutput_classifier import TMCoalesceMultiOuputClassifier
+from tmu.experimental.models.multioutput_classifier import TMCoalesceMultiOuputClassifier
 from tqdm import tqdm
 
 colors = {
