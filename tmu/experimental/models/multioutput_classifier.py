@@ -144,51 +144,64 @@ class TMCoalesceMultiOuputClassifier(TMBaseModel, SingleClauseBankMixin, MultiWe
         for c in range(self.number_of_classes):
             self.wcomb[:, c] = self.weight_banks[c].get_weights()
 
+        # Find all 0 and 1 indices in Y
+        pos_class_ind = [np.where(i == 1)[0] for i in Y]
+        neg_class_ind = [np.where(i == 0)[0] for i in Y]
+
+        self.pf = np.zeros(self.number_of_classes)
+        self.nf = np.zeros(self.number_of_classes)
+
         for e in pbar:
-            y = Y[e, :]
-            pos_class_ind = np.argwhere(y == 1).ravel()
+            # y = Y[e, :]
+            # pos_class_ind = np.argwhere(y == 1).ravel()
 
             clause_outputs = self.clause_bank.calculate_clause_outputs_update(self.literal_active, encoded_X_train, e)
-
             class_sums = (clause_outputs * self.clause_active)[np.newaxis, :] @ self.wcomb
             class_sums = np.clip(class_sums, -self.T, self.T).astype(np.int32).ravel()
 
-            t = -self.T * np.ones(self.number_of_classes)
-            t[pos_class_ind] *= -1
+            pos_ind = pos_class_ind[e]
+            neg_ind = neg_class_ind[e]
+            t = self.T * np.ones(self.number_of_classes)
+            t[neg_ind] *= -1
             self.update_ps = (t - class_sums) / (2 * t)
 
-            for c in range(self.number_of_classes):
+            for c in pos_ind:
                 update_p = self.update_ps[c]
-                if Y[e, c] == 1:
-                    self.clause_bank.type_i_feedback(
-                        update_p=update_p * self.type_i_p,
-                        clause_active=self.clause_active * (self.weight_banks[c].get_weights() >= 0),
-                        literal_active=self.literal_active,
-                        encoded_X=encoded_X_train,
-                        e=e,
+                self.clause_bank.type_i_feedback(
+                    update_p=update_p * self.type_i_p,
+                    clause_active=self.clause_active * (self.weight_banks[c].get_weights() >= 0),
+                    literal_active=self.literal_active,
+                    encoded_X=encoded_X_train,
+                    e=e,
+                )
+                self.clause_bank.type_ii_feedback(
+                    update_p=update_p * self.type_ii_p,
+                    clause_active=self.clause_active * (self.weight_banks[c].get_weights() < 0),
+                    literal_active=self.literal_active,
+                    encoded_X=encoded_X_train,
+                    e=e,
+                )
+                if (self.weight_banks[c].get_weights() >= 0).sum() < self.max_positive_clauses:
+                    self.weight_banks[c].increment(
+                        clause_output=clause_outputs,
+                        update_p=update_p,
+                        clause_active=self.clause_active,
+                        positive_weights=True,
                     )
-                    self.clause_bank.type_ii_feedback(
-                        update_p=update_p * self.type_ii_p,
-                        clause_active=self.clause_active * (self.weight_banks[c].get_weights() < 0),
-                        literal_active=self.literal_active,
-                        encoded_X=encoded_X_train,
-                        e=e,
-                    )
-                    if (self.weight_banks[c].get_weights() >= 0).sum() < self.max_positive_clauses:
-                        self.weight_banks[c].increment(
-                            clause_output=clause_outputs,
-                            update_p=update_p,
-                            clause_active=self.clause_active,
-                            positive_weights=True,
-                        )
-                        self.wcomb[:, c] = self.weight_banks[c].get_weights()
+                    self.wcomb[:, c] = self.weight_banks[c].get_weights()
 
-                    self.update_ps[c] = 0.0
+                self.update_ps[c] = 0.0
+                self.pf[c] += 1
 
-                else:
-                    if self.rng.uniform() > (self.q / max(1, self.number_of_classes - 1)):
-                        continue
+            if np.sum(self.update_ps) == 0:
+                continue
 
+            rand_smp = self.rng.random_sample(self.number_of_classes)
+            self.rng.shuffle(neg_ind)
+
+            for c in neg_ind:
+                if rand_smp[c] <= (self.q / max(1, self.number_of_classes - 1)):
+                    update_p = self.update_ps[c]
                     self.clause_bank.type_i_feedback(
                         update_p=update_p * self.type_i_p,
                         clause_active=self.clause_active * (self.weight_banks[c].get_weights() < 0),
@@ -213,6 +226,11 @@ class TMCoalesceMultiOuputClassifier(TMBaseModel, SingleClauseBankMixin, MultiWe
                     )
                     self.wcomb[:, c] = self.weight_banks[c].get_weights()
                     self.update_ps[c] = 0.0
+                    self.nf[c] += 1
+        print(f'{self.pf=}')
+        print(f'{self.pf/Y.shape[0]=}')
+        print(f'{self.nf=}')
+        print(f'{self.nf/Y.shape[0]=}')
         return
 
     def predict(

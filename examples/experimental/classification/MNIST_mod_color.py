@@ -126,7 +126,7 @@ if __name__ == "__main__":
     parser.add_argument("--clauses", default=2000, type=int)
     parser.add_argument("--T", default=3125, type=int)
     parser.add_argument("--s", default=10.0, type=float)
-    parser.add_argument("--q", default=5.0, type=float)
+    parser.add_argument("--q", default=-1, type=float)
     parser.add_argument("--type_ratio", default=1.0, type=float)
     parser.add_argument("--platform", default="GPU", type=str)
     parser.add_argument("--epochs", default=1, type=int)
