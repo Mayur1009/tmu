@@ -244,6 +244,7 @@ class TMBaseModel:
 
         if not cuda_installed:
             _LOGGER.warning("CUDA not installed, using CPU clause bank")
+            self.platform = "CPU"
             return self._build_cpu_bank(X=X)
 
         clause_bank_type = ClauseBankCUDA

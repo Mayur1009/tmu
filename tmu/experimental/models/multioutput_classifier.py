@@ -90,6 +90,7 @@ class TMCoalesceMultiOuputClassifier(
     def init_clause_bank(self, X: np.ndarray, Y: np.ndarray):
         clause_bank_type, clause_bank_args = self.build_clause_bank(X=X)
         self.clause_bank = clause_bank_type(**clause_bank_args)
+        self.X_shape = X.shape
 
     def init_weight_bank(self, X: np.ndarray, Y: np.ndarray):
         self.number_of_classes = Y.shape[1]
@@ -327,11 +328,12 @@ class TMCoalesceMultiOuputClassifier(
             class_sums = np.clip(class_sums, -self.T, self.T).astype(np.int32)
         return class_sums
 
-    def to_cpu(self, X):
+    def to_cpu(self):
         if self.platform in ["GPU", "CUDA"]:
+            arr = np.empty((self.X_shape))
             clause_bank_gpu = self.clause_bank
             clause_bank_gpu.synchronize_clause_bank()
-            clause_bank_type, clause_bank_args = self._build_cpu_bank(X)
+            clause_bank_type, clause_bank_args = self._build_cpu_bank(arr)
             clause_bank_cpu = clause_bank_type(**clause_bank_args)
 
             clause_bank_cpu.clause_bank = clause_bank_gpu.clause_bank
