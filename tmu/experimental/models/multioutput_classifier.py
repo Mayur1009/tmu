@@ -18,7 +18,8 @@
 # SOFTWARE.
 
 import numpy as np
-import pandas as pd
+
+# import pandas as pd
 from tqdm import tqdm
 
 from tmu.models.base import MultiWeightBankMixin, SingleClauseBankMixin, TMBaseModel
@@ -166,14 +167,11 @@ class TMCoalesceMultiOuputClassifier(
         pos_class_ind = [np.where(i == 1)[0] for i in Y]
         neg_class_ind = [np.where(i == 0)[0] for i in Y]
 
-        # self.r = Y.sum(axis=0) / Y.shape[0]
-        self.pf = np.zeros(self.number_of_classes)
-        self.nf = np.zeros(self.number_of_classes)
-        self.avg_n_neg_classes = 0
+        # self.pf = np.zeros(self.number_of_classes)
+        # self.nf = np.zeros(self.number_of_classes)
+        # self.avg_n_neg_classes = 0
 
         for e in pbar:
-            # y = Y[e, :]
-            # pos_class_ind = np.argwhere(y == 1).ravel()
 
             clause_outputs = self.clause_bank.calculate_clause_outputs_update(
                 self.literal_active, encoded_X_train, e
@@ -219,7 +217,7 @@ class TMCoalesceMultiOuputClassifier(
                     self.wcomb[:, c] = self.weight_banks[c].get_weights()
 
                 self.update_ps[c] = 0.0
-                self.pf[c] += 1
+                # self.pf[c] += 1
 
             if np.sum(self.update_ps) == 0:
                 continue
@@ -229,7 +227,6 @@ class TMCoalesceMultiOuputClassifier(
 
             for c in neg_ind:
                 if rand_smp[c] <= (self.q / max(1, self.number_of_classes - 1)):
-                    # if rand_smp[c] <= self.r[c]:
                     update_p = self.update_ps[c]
                     self.clause_bank.type_i_feedback(
                         update_p=update_p * self.type_i_p,
@@ -257,24 +254,24 @@ class TMCoalesceMultiOuputClassifier(
                     )
                     self.wcomb[:, c] = self.weight_banks[c].get_weights()
                     self.update_ps[c] = 0.0
-                    self.nf[c] += 1
-                    self.avg_n_neg_classes += 1
-        print(
-            f"Average num of neg classes selected = {self.avg_n_neg_classes / Y.shape[0]}"
-        )
-        print(
-            pd.DataFrame(
-                {
-                    "n_pos": self.pf,
-                    "n_neg": self.nf,
-                    "R": self.pf / self.nf,
-                    "n_lab": Y.sum(axis=0),
-                    "n_lab_e": Y.sum(axis=0) / Y.shape[0],
-                    "n_nlb": Y.shape[0] - Y.sum(axis=0),
-                    "n_nlb_e": (Y.shape[0] - Y.sum(axis=0)) / Y.shape[0],
-                }
-            )
-        )
+                    # self.nf[c] += 1
+                    # self.avg_n_neg_classes += 1
+        # print(
+        #     f"Average num of neg classes selected = {self.avg_n_neg_classes / Y.shape[0]}"
+        # )
+        # print(
+        #     pd.DataFrame(
+        #         {
+        #             "n_pos": self.pf,
+        #             "n_neg": self.nf,
+        #             "R": self.pf / self.nf,
+        #             "n_lab": Y.sum(axis=0),
+        #             "n_lab_e": Y.sum(axis=0) / Y.shape[0],
+        #             "n_nlb": Y.shape[0] - Y.sum(axis=0),
+        #             "n_nlb_e": (Y.shape[0] - Y.sum(axis=0)) / Y.shape[0],
+        #         }
+        #     )
+        # )
         return
 
     def predict(
