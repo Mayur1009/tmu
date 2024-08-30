@@ -172,7 +172,7 @@ class TMCoalesceMultiOuputClassifier(
         self.pf = np.zeros(self.number_of_classes)
         self.nf = np.zeros(self.number_of_classes)
         self.avg_n_neg_classes = 0
-        self.num_pos_labels_per_class = Y.sum(axis=0) / Y.shape[0]
+        self.num_pos_labels_per_class = ((Y.sum(axis=0) / Y.shape[0]) * 0.5) + 0.25
 
         for e in pbar:
             clause_outputs = self.clause_bank.calculate_clause_outputs_update(
