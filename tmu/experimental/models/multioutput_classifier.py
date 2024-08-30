@@ -269,10 +269,7 @@ class TMCoalesceMultiOuputClassifier(
                     "R": np.divide(
                         self.pf, self.nf, out=np.zeros_like(self.pf), where=self.nf != 0
                     ),
-                    "n_lab": Y.sum(axis=0),
-                    "n_lab_e": Y.sum(axis=0) / Y.shape[0],
-                    "n_nlb": Y.shape[0] - Y.sum(axis=0),
-                    "n_nlb_e": (Y.shape[0] - Y.sum(axis=0)) / Y.shape[0],
+                    "labs/class": self.num_pos_labels_per_class
                 }
             )
         )
