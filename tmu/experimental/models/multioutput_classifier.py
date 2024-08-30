@@ -228,14 +228,7 @@ class TMCoalesceMultiOuputClassifier(
             self.rng.shuffle(neg_ind)
 
             for c in neg_ind:
-                if rand_smp[c] <= 1 - (
-                    (
-                        1
-                        - self.num_pos_labels_per_class[c]
-                        + (self.q / max(1, self.number_of_classes - 1))
-                    )
-                    / 2
-                ):
+                if rand_smp[c] <= self.num_pos_labels_per_class[c]:
                     update_p = self.update_ps[c]
                     self.clause_bank.type_i_feedback(
                         update_p=update_p * self.type_i_p,
