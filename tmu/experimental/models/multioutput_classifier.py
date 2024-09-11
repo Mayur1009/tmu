@@ -114,7 +114,7 @@ class TMCoalesceMultiOuputClassifier(
         if self.max_positive_clauses is None:
             self.max_positive_clauses = self.number_of_clauses
 
-    def fit(self, X, Y, shuffle=True, progress_bar=False, **kwargs):
+    def fit(self, X, Y, shuffle=True, progress_bar=False, met=False, **kwargs):
         self.init(X, Y)
 
         encoded_X_train = self.train_encoder_cache.get_encoded_data(
@@ -167,12 +167,13 @@ class TMCoalesceMultiOuputClassifier(
         pos_class_ind = [np.where(i == 1)[0] for i in Y]
         neg_class_ind = [np.where(i == 0)[0] for i in Y]
 
-        # self.pf = np.zeros(self.number_of_classes)
-        # self.nf = np.zeros(self.number_of_classes)
+        self.pf = np.zeros(self.number_of_classes)
+        self.nf = np.zeros(self.number_of_classes)
+        self.class_sums_per_sample = np.empty((X.shape[0], self.number_of_classes))
+        self.update_p_per_sample = np.empty((X.shape[0], self.number_of_classes))
         # self.avg_n_neg_classes = 0
 
         for e in pbar:
-
             clause_outputs = self.clause_bank.calculate_clause_outputs_update(
                 self.literal_active, encoded_X_train, e
             )
@@ -180,12 +181,15 @@ class TMCoalesceMultiOuputClassifier(
                 np.newaxis, :
             ] @ self.wcomb
             class_sums = np.clip(class_sums, -self.T, self.T).astype(np.int32).ravel()
+            self.class_sums_per_sample[e, :] = class_sums
 
             pos_ind = pos_class_ind[e]
             neg_ind = neg_class_ind[e]
             t = self.T * np.ones(self.number_of_classes)
             t[neg_ind] *= -1
             self.update_ps = (t - class_sums) / (2 * t)
+
+            self.update_p_per_sample[e, :] = self.update_ps
 
             for c in pos_ind:
                 update_p = self.update_ps[c]
@@ -217,7 +221,7 @@ class TMCoalesceMultiOuputClassifier(
                     self.wcomb[:, c] = self.weight_banks[c].get_weights()
 
                 self.update_ps[c] = 0.0
-                # self.pf[c] += 1
+                self.pf[c] += 1
 
             if np.sum(self.update_ps) == 0:
                 continue
@@ -254,7 +258,7 @@ class TMCoalesceMultiOuputClassifier(
                     )
                     self.wcomb[:, c] = self.weight_banks[c].get_weights()
                     self.update_ps[c] = 0.0
-                    # self.nf[c] += 1
+                    self.nf[c] += 1
                     # self.avg_n_neg_classes += 1
         # print(
         #     f"Average num of neg classes selected = {self.avg_n_neg_classes / Y.shape[0]}"
@@ -272,7 +276,13 @@ class TMCoalesceMultiOuputClassifier(
         #         }
         #     )
         # )
-        return
+        if met:
+            return {
+                "pf": self.pf,
+                "nf": self.nf,
+                "class_sums": self.class_sums_per_sample,
+                "update_p": self.update_p_per_sample,
+            }
 
     def predict(
         self,

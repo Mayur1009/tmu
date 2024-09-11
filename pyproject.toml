@@ -53,6 +53,7 @@ repository = "https://github.com/cair/tmu/"
 
 [tool.basedpyright]
 reportMissingTypeStubs = "information"
+typeCheckingMode = "standard"
 
 [tool.setuptools.package-dir]
 tmu = "tmu"
