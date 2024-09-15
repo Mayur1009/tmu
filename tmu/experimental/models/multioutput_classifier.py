@@ -171,11 +171,21 @@ class TMCoalesceMultiOuputClassifier(
         self.nf = np.zeros(self.number_of_classes)
         self.class_sums_per_sample = np.empty((X.shape[0], self.number_of_classes))
         self.update_p_per_sample = np.empty((X.shape[0], self.number_of_classes))
+        self.clause_outputs_per_sample = np.empty((X.shape[0], self.number_of_clauses))
+        self.patch_outputs_per_sample = np.empty(
+            (X.shape[0], self.number_of_clauses, self.clause_bank.number_of_patches)
+        )
         # self.avg_n_neg_classes = 0
 
         for e in pbar:
             clause_outputs = self.clause_bank.calculate_clause_outputs_update(
                 self.literal_active, encoded_X_train, e
+            )
+            self.clause_outputs_per_sample[e, :] = clause_outputs
+            self.patch_outputs_per_sample[e, :] = (
+                self.clause_bank.calculate_clause_outputs_patchwise(
+                    encoded_X_train, e
+                ).reshape((self.number_of_clauses, self.clause_bank.number_of_patches))
             )
             class_sums = (clause_outputs * self.clause_active)[
                 np.newaxis, :
@@ -282,6 +292,8 @@ class TMCoalesceMultiOuputClassifier(
                 "nf": self.nf,
                 "class_sums": self.class_sums_per_sample,
                 "update_p": self.update_p_per_sample,
+                "clause_outputs": self.clause_outputs_per_sample,
+                "patch_outputs": self.patch_outputs_per_sample,
             }
 
     def predict(
