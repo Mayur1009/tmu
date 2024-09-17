@@ -95,8 +95,8 @@ class TMCoalesceMultiOuputClassifier(
 
     def init_weight_bank(self, X: np.ndarray, Y: np.ndarray):
         self.number_of_classes = Y.shape[1]
-        # if self.q < 0:
-        #     self.q = max(1, self.number_of_classes - 1) / 2
+        if self.q < 0:
+            self.q = max(1, self.number_of_classes - 1) / 2
         self.weight_banks.set_clause_init(
             WeightBank,
             dict(
