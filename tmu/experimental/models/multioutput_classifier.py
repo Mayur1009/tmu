@@ -174,12 +174,16 @@ class TMCoalesceMultiOuputClassifier(
         # self.avg_n_neg_classes = 0
         
         self.h = np.zeros(self.number_of_classes)
+        self.r = np.zeros(self.number_of_classes)
         labels_per_class = np.sum(Y, axis=0)
+        not_labels_per_class = Y.shape[0] - labels_per_class
 
         for c in range(self.number_of_classes):
             self.h[c] = np.min(labels_per_class) / labels_per_class[c]
+            self.r[c] = np.min(not_labels_per_class) / not_labels_per_class[c]
 
         print(f'{self.h=}')
+        print(f'{self.r=}')
 
         for e in pbar:
             clause_outputs = self.clause_bank.calculate_clause_outputs_update(
@@ -235,11 +239,12 @@ class TMCoalesceMultiOuputClassifier(
             if np.sum(self.update_ps) == 0:
                 continue
 
-            rand_smp = self.rng.random_sample(self.number_of_classes)
+            # rand_smp = self.rng.random_sample(self.number_of_classes)
             self.rng.shuffle(neg_ind)
 
             for c in neg_ind:
-                if rand_smp[c] <= (self.q / max(1, self.number_of_classes - 1)):
+                # if rand_smp[c] <= (self.q / max(1, self.number_of_classes - 1)):
+                if self.rng.random() <= self.r[c]:
                     update_p = self.update_ps[c]
                     self.clause_bank.type_i_feedback(
                         update_p=update_p * self.type_i_p,
