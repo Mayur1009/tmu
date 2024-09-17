@@ -95,8 +95,8 @@ class TMCoalesceMultiOuputClassifier(
 
     def init_weight_bank(self, X: np.ndarray, Y: np.ndarray):
         self.number_of_classes = Y.shape[1]
-        if self.q < 0:
-            self.q = max(1, self.number_of_classes - 1) / 2
+        # if self.q < 0:
+        #     self.q = max(1, self.number_of_classes - 1) / 2
         self.weight_banks.set_clause_init(
             WeightBank,
             dict(
@@ -172,6 +172,14 @@ class TMCoalesceMultiOuputClassifier(
         self.class_sums_per_sample = np.empty((X.shape[0], self.number_of_classes))
         self.update_p_per_sample = np.empty((X.shape[0], self.number_of_classes))
         # self.avg_n_neg_classes = 0
+        
+        self.h = np.zeros(self.number_of_classes)
+        labels_per_class = np.sum(Y, axis=0)
+
+        for c in range(self.number_of_classes):
+            self.h[c] = np.min(labels_per_class) / labels_per_class[c]
+
+        print(f'{self.h=}')
 
         for e in pbar:
             clause_outputs = self.clause_bank.calculate_clause_outputs_update(
@@ -192,36 +200,37 @@ class TMCoalesceMultiOuputClassifier(
             self.update_p_per_sample[e, :] = self.update_ps
 
             for c in pos_ind:
-                update_p = self.update_ps[c]
-                self.clause_bank.type_i_feedback(
-                    update_p=update_p * self.type_i_p,
-                    clause_active=self.clause_active
-                    * (self.weight_banks[c].get_weights() >= 0),
-                    literal_active=self.literal_active,
-                    encoded_X=encoded_X_train,
-                    e=e,
-                )
-                self.clause_bank.type_ii_feedback(
-                    update_p=update_p * self.type_ii_p,
-                    clause_active=self.clause_active
-                    * (self.weight_banks[c].get_weights() < 0),
-                    literal_active=self.literal_active,
-                    encoded_X=encoded_X_train,
-                    e=e,
-                )
-                if (
-                    self.weight_banks[c].get_weights() >= 0
-                ).sum() < self.max_positive_clauses:
-                    self.weight_banks[c].increment(
-                        clause_output=clause_outputs,
-                        update_p=update_p,
-                        clause_active=self.clause_active,
-                        positive_weights=True,
+                if self.rng.random() <= self.h[c]:
+                    update_p = self.update_ps[c]
+                    self.clause_bank.type_i_feedback(
+                        update_p=update_p * self.type_i_p,
+                        clause_active=self.clause_active
+                        * (self.weight_banks[c].get_weights() >= 0),
+                        literal_active=self.literal_active,
+                        encoded_X=encoded_X_train,
+                        e=e,
                     )
-                    self.wcomb[:, c] = self.weight_banks[c].get_weights()
+                    self.clause_bank.type_ii_feedback(
+                        update_p=update_p * self.type_ii_p,
+                        clause_active=self.clause_active
+                        * (self.weight_banks[c].get_weights() < 0),
+                        literal_active=self.literal_active,
+                        encoded_X=encoded_X_train,
+                        e=e,
+                    )
+                    if (
+                        self.weight_banks[c].get_weights() >= 0
+                    ).sum() < self.max_positive_clauses:
+                        self.weight_banks[c].increment(
+                            clause_output=clause_outputs,
+                            update_p=update_p,
+                            clause_active=self.clause_active,
+                            positive_weights=True,
+                        )
+                        self.wcomb[:, c] = self.weight_banks[c].get_weights()
 
-                self.update_ps[c] = 0.0
-                self.pf[c] += 1
+                    self.update_ps[c] = 0.0
+                    self.pf[c] += 1
 
             if np.sum(self.update_ps) == 0:
                 continue
