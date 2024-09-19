@@ -359,6 +359,29 @@ class TMCoalesceMultiOuputClassifier(
         else:
             print("to_cpu(): Not implemented....")
 
+    def to_gpu(self):
+        if self.platform == "CPU":
+            arr = np.empty((self.X_shape))
+            clause_bank_cpu = self.clause_bank
+            clause_bank_type, clause_bank_args = self._build_gpu_bank(arr)
+            clause_bank_gpu = clause_bank_type(**clause_bank_args)
+
+            clause_bank_gpu.clause_bank = clause_bank_cpu.clause_bank
+            clause_bank_gpu.clause_output = clause_bank_cpu.clause_output
+            clause_bank_gpu.literal_clause_count = clause_bank_cpu.literal_clause_count
+
+            clause_bank_gpu._cffi_init()
+
+            self.clause_bank = clause_bank_gpu
+            self.platform = "CUDA"
+            print("to_gpu(): Successful....")
+
+        elif self.platform in ["GPU", "CUDA"]:
+            print("to_gpu(): Already CUDA....")
+
+        else:
+            print("to_gpu(): Not implemented....")
+
     def clause_precision(self, the_class, X, Y):
         clause_outputs = self.transform(X)
         weights = self.weight_banks[the_class].get_weights()
