@@ -357,65 +357,76 @@ class TMCoalesceMultiOuputClassifier(
             if y[i] == 1:
                 self.update_ps[i] = 0.0
             else:
-                self.update_ps[i] = np.dot(
+                cs = np.dot(
                     self.clause_active * self.weight_banks[i].get_weights(),
                     clause_outputs,
                 ).astype(np.int32)
-                self.update_ps[i] = np.clip(self.update_ps[i], -self.T, self.T)
-                self.update_ps[i] = 1.0 * (self.T + self.update_ps[i]) / (2 * self.T)
+                cs = np.clip(cs, -self.T, self.T)
+                self.update_ps[i] = 1.0 * (self.T + cs) / (2 * self.T)
+                self.update_p_per_sample[e, i] = self.update_ps[i]
+                self.class_sums_per_sample[e, i] = cs
 
         if self.update_ps.sum() == 0:
             return
 
-        if self.focused_negative_sampling:
-            not_target = self.rng.choice(self.number_of_classes, p=self.update_ps / self.update_ps.sum())
-            update_p = self.update_ps[not_target]
-        else:
-            not_target = self.rng.randint(self.number_of_classes)
-            while not_target == target_class:
-                not_target = self.rng.randint(self.number_of_classes)
-            update_p = self.update_ps[not_target]
+        # if self.focused_negative_sampling:
+        #     not_target = self.rng.choice(self.number_of_classes, p=self.update_ps / self.update_ps.sum())
+        #     update_p = self.update_ps[not_target]
+        # else:
+        #     not_target = self.rng.randint(self.number_of_classes)
+        #     while not_target == target_class:
+        #         not_target = self.rng.randint(self.number_of_classes)
+        #     update_p = self.update_ps[not_target]
+
+        not_target = self.rng.choice(
+            self.number_of_classes, p=self.update_ps / self.update_ps.sum()
+        )
+        update_p = self.update_ps[not_target]
 
         self.clause_bank.type_i_feedback(
             update_p=update_p * self.type_i_p,
-            clause_active=self.clause_active * (self.weight_banks[not_target].get_weights() < 0),
+            clause_active=self.clause_active
+            * (self.weight_banks[not_target].get_weights() < 0),
             literal_active=self.literal_active,
             encoded_X=encoded_X_train,
-            e=e
+            e=e,
         )
 
         self.clause_bank.type_ii_feedback(
             update_p=update_p * self.type_ii_p,
-            clause_active=self.clause_active * (self.weight_banks[not_target].get_weights() >= 0),
+            clause_active=self.clause_active
+            * (self.weight_banks[not_target].get_weights() >= 0),
             literal_active=self.literal_active,
             encoded_X=encoded_X_train,
-            e=e
+            e=e,
         )
 
         if self.type_iii_feedback and type_iii_feedback_selection == 1:
             self.clause_bank.type_iii_feedback(
                 update_p=update_p,
-                clause_active=self.clause_active * (self.weight_banks[not_target].get_weights() < 0),
+                clause_active=self.clause_active
+                * (self.weight_banks[not_target].get_weights() < 0),
                 literal_active=self.literal_active,
                 encoded_X=encoded_X_train,
                 e=e,
-                target=1
+                target=1,
             )
 
             self.clause_bank.type_iii_feedback(
                 update_p=update_p,
-                clause_active=self.clause_active * (self.weight_banks[not_target].get_weights() >= 0),
+                clause_active=self.clause_active
+                * (self.weight_banks[not_target].get_weights() >= 0),
                 literal_active=self.literal_active,
                 encoded_X=encoded_X_train,
                 e=e,
-                target=0
+                target=0,
             )
 
         self.weight_banks[not_target].decrement(
             clause_output=clause_outputs,
             update_p=update_p,
             clause_active=self.clause_active,
-            negative_weights=True
+            negative_weights=True,
         )
         self.nf[not_target] += 1
 
