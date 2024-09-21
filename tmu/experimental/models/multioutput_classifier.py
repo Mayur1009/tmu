@@ -53,6 +53,7 @@ class TMCoalesceMultiOuputClassifier(
         clause_drop_p=0.0,
         literal_drop_p=0.0,
         q=-1,
+        class_weights=[],
         seed=None,
     ):
         super().__init__(
@@ -87,6 +88,7 @@ class TMCoalesceMultiOuputClassifier(
 
         self.max_positive_clauses = max_positive_clauses
         self.q = q
+        self.class_weights = class_weights
 
     def init_clause_bank(self, X: np.ndarray, Y: np.ndarray):
         clause_bank_type, clause_bank_args = self.build_clause_bank(X=X)
@@ -97,6 +99,8 @@ class TMCoalesceMultiOuputClassifier(
         self.number_of_classes = Y.shape[1]
         if self.q < 0:
             self.q = max(1, self.number_of_classes - 1) / 2
+        if len(self.class_weights) == 0:
+            self.class_weights = [1] * self.number_of_classes
         self.weight_banks.set_clause_init(
             WeightBank,
             dict(
@@ -297,7 +301,9 @@ class TMCoalesceMultiOuputClassifier(
             self.clause_active * self.weight_banks[target_class].get_weights(),
             clause_outputs,
         ).astype(np.int32)
-        class_sum = np.clip(class_sum, -self.T, self.T)
+        class_sum = np.clip(
+            self.class_weights[target_class] * class_sum, -self.T, self.T
+        )
         update_p = (self.T - class_sum) / (2 * self.T)
         self.update_p_per_sample[e, target_class] = update_p
         self.class_sums_per_sample[e, target_class] = class_sum
@@ -361,7 +367,7 @@ class TMCoalesceMultiOuputClassifier(
                     self.clause_active * self.weight_banks[i].get_weights(),
                     clause_outputs,
                 ).astype(np.int32)
-                cs = np.clip(cs, -self.T, self.T)
+                cs = np.clip(self.class_weights[i] * cs, -self.T, self.T)
                 self.update_ps[i] = 1.0 * (self.T + cs) / (2 * self.T)
                 self.update_p_per_sample[e, i] = self.update_ps[i]
                 self.class_sums_per_sample[e, i] = cs
