@@ -154,7 +154,7 @@ class TMCoalesceMultiOuputClassifier(
         if shuffle:
             self.rng.shuffle(shuffled_index)
 
-        pbar = tqdm(shuffled_index) if progress_bar else shuffled_index
+        pbar = tqdm(shuffled_index, leave=False) if progress_bar else shuffled_index
 
         # Combine all weight banks, to make use of faster numpy matrix operation
         self.wcomb = np.empty(
@@ -334,6 +334,42 @@ class TMCoalesceMultiOuputClassifier(
         if clip_class_sum:
             class_sums = np.clip(class_sums, -self.T, self.T).astype(np.int32)
         return class_sums
+
+    def predict_patchwise(
+        self, X, shuffle=False, clip_class_sum=False, progress_bar=False
+    ):
+        encoded_X_test = self.clause_bank.prepare_X(X)
+
+        for c in range(self.number_of_classes):
+            self.wcomb[:, c] = self.weight_banks[c].get_weights()
+
+        shuffled_index = np.arange(X.shape[0])
+        if shuffle:
+            self.rng.shuffle(shuffled_index)
+        pbar = tqdm(shuffled_index, leave=False) if progress_bar else shuffled_index
+
+        # Compute class sums for all samples
+        class_sums = np.empty((X.shape[0], self.number_of_classes))
+        clause_outputs = np.empty((X.shape[0], self.number_of_clauses))
+        patch_outputs = np.empty((X.shape[0], self.number_of_clauses * self.clause_bank.number_of_patches))
+        for e in pbar:
+            class_sums[e, :], clause_outputs[e, :], patch_outputs[e, ...] = self.compute_outputs(encoded_X_test, e, clip_class_sum)
+
+        output = (class_sums >= 0).astype(np.uint32)
+
+        return output, class_sums, clause_outputs, patch_outputs
+
+    def compute_outputs(self, encoded_X_test, ith_sample: int, clip_class_sum: bool):
+        clause_outputs = self.clause_bank.calculate_clause_outputs_predict(
+            encoded_X_test, ith_sample
+        )
+        patch_outputs = self.clause_bank.calculate_clause_outputs_patchwise(
+            encoded_X_test, ith_sample
+        )
+        class_sums = clause_outputs[np.newaxis, :] @ self.wcomb
+        if clip_class_sum:
+            class_sums = np.clip(class_sums, -self.T, self.T).astype(np.int32)
+        return class_sums, clause_outputs, patch_outputs
 
     def to_cpu(self):
         if self.platform in ["GPU", "CUDA"]:
