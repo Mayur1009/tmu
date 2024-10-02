@@ -238,11 +238,15 @@ class ClauseBank(BaseClauseBank):
         clause_active,
         literal_active,
         encoded_X,
-        e
+        e, counter
     ):
         ptr_xi = ffi.cast("unsigned int *", encoded_X[e, :].ctypes.data)
         ptr_clause_active = ffi.cast("unsigned int *", clause_active.ctypes.data)
         ptr_literal_active = ffi.cast("unsigned int *", literal_active.ctypes.data)
+
+        count_t1 = np.zeros(2, dtype=np.int32, order="C")
+        ptr_count_t1 = ffi.cast("unsigned int *", count_t1.ctypes.data)
+
         lib.cb_type_i_feedback(
             self.ptr_ta_state,
             self.ptr_feedback_to_ta,
@@ -258,8 +262,12 @@ class ClauseBank(BaseClauseBank):
             self.max_included_literals,
             ptr_clause_active,
             ptr_literal_active,
-            ptr_xi
+            ptr_xi,
+            ptr_count_t1,
         )
+
+        counter.inc_t1a(count_t1[0])
+        counter.inc_t1b(count_t1[1])
 
         self.incremental_clause_evaluation_initialized = False
 
@@ -269,11 +277,14 @@ class ClauseBank(BaseClauseBank):
         clause_active,
         literal_active,
         encoded_X,
-        e
+        e, counter
     ):
         ptr_xi = ffi.cast("unsigned int *", encoded_X[e, :].ctypes.data)
         ptr_clause_active = ffi.cast("unsigned int *", clause_active.ctypes.data)
         ptr_literal_active = ffi.cast("unsigned int *", literal_active.ctypes.data)
+
+        count_t2 = np.zeros(1, dtype=np.int32, order="C")
+        ptr_count_t2 = ffi.cast("unsigned int *", count_t2.ctypes.data)
 
         lib.cb_type_ii_feedback(
             self.ptr_ta_state,
@@ -285,8 +296,11 @@ class ClauseBank(BaseClauseBank):
             update_p,
             ptr_clause_active,
             ptr_literal_active,
-            ptr_xi
+            ptr_xi,
+            ptr_count_t2
         )
+
+        counter.inc_t2(count_t2[0])
 
         self.incremental_clause_evaluation_initialized = False
 

@@ -40,7 +40,8 @@ void cb_type_i_feedback(
     unsigned int max_included_literals,
     unsigned int *clause_active,
     unsigned int *literal_active,
-    unsigned int *Xi
+    unsigned int *Xi,
+    unsigned int *t1
 );
 
 void cb_type_ii_feedback(
@@ -53,7 +54,8 @@ void cb_type_ii_feedback(
     float update_p,
     unsigned int *clause_active,
     unsigned int *literal_active,
-    unsigned int *Xi
+    unsigned int *Xi,
+    unsigned int *t2
 );
 
 void cb_type_iii_feedback(

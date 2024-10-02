@@ -290,7 +290,8 @@ void cb_type_i_feedback(
         unsigned int max_included_literals,
         unsigned int *clause_active,
         unsigned int *literal_active,
-        unsigned int *Xi
+        unsigned int *Xi,
+        unsigned int *t1
 )
 {
     // Lage mask/filter
@@ -324,6 +325,7 @@ void cb_type_i_feedback(
 
 		if (clause_output && cb_number_of_include_actions(ta_state, j, number_of_literals, number_of_state_bits) <= max_included_literals) {
 			// Type Ia Feedback
+            t1[0]++;
 			for (int k = 0; k < number_of_ta_chunks; ++k) {
 				unsigned int ta_pos = k*number_of_state_bits;
 
@@ -341,7 +343,7 @@ void cb_type_i_feedback(
 			}
 		} else {
 			// Type Ib Feedback
-				
+            t1[1]++;
 			for (int k = 0; k < number_of_ta_chunks; ++k) {
 				unsigned int ta_pos = k*number_of_state_bits;
 
@@ -365,7 +367,8 @@ void cb_type_ii_feedback(
         float update_p,
         unsigned int *clause_active,
         unsigned int *literal_active,
-        unsigned int *Xi
+        unsigned int *Xi,
+        unsigned int* t2
 )
 {
 	unsigned int filter;
@@ -388,6 +391,7 @@ void cb_type_ii_feedback(
 		cb_calculate_clause_output_feedback(&ta_state[clause_pos], output_one_patches, &clause_output, &clause_patch, number_of_ta_chunks, number_of_state_bits, filter, number_of_patches, literal_active, Xi);
 
 		if (clause_output) {				
+            t2[0]++;
 			for (int k = 0; k < number_of_ta_chunks; ++k) {
 				unsigned int ta_pos = k*number_of_state_bits;
 				cb_inc(&ta_state[clause_pos + ta_pos], literal_active[k] & (~Xi[clause_patch*number_of_ta_chunks + k]), number_of_state_bits);

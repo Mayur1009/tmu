@@ -173,6 +173,9 @@ class TMCoalesceMultiOuputClassifier(
         self.update_p_per_sample = np.empty((X.shape[0], self.number_of_classes))
         # self.avg_n_neg_classes = 0
 
+        pos_counters = [Counter(c, "positive") for c in range(self.number_of_classes)]
+        neg_counters = [Counter(c, "negative") for c in range(self.number_of_classes)]
+
         for e in pbar:
             clause_outputs = self.clause_bank.calculate_clause_outputs_update(
                 self.literal_active, encoded_X_train, e
@@ -200,6 +203,7 @@ class TMCoalesceMultiOuputClassifier(
                     literal_active=self.literal_active,
                     encoded_X=encoded_X_train,
                     e=e,
+                    counter=pos_counters[c],
                 )
                 self.clause_bank.type_ii_feedback(
                     update_p=update_p * self.type_ii_p,
@@ -208,6 +212,7 @@ class TMCoalesceMultiOuputClassifier(
                     literal_active=self.literal_active,
                     encoded_X=encoded_X_train,
                     e=e,
+                    counter=pos_counters[c],
                 )
                 if (
                     self.weight_banks[c].get_weights() >= 0
@@ -239,6 +244,7 @@ class TMCoalesceMultiOuputClassifier(
                         literal_active=self.literal_active,
                         encoded_X=encoded_X_train,
                         e=e,
+                        counter=neg_counters[c],
                     )
 
                     self.clause_bank.type_ii_feedback(
@@ -248,6 +254,7 @@ class TMCoalesceMultiOuputClassifier(
                         literal_active=self.literal_active,
                         encoded_X=encoded_X_train,
                         e=e,
+                        counter=neg_counters[c],
                     )
 
                     self.weight_banks[c].decrement(
@@ -259,23 +266,11 @@ class TMCoalesceMultiOuputClassifier(
                     self.wcomb[:, c] = self.weight_banks[c].get_weights()
                     self.update_ps[c] = 0.0
                     self.nf[c] += 1
-                    # self.avg_n_neg_classes += 1
-        # print(
-        #     f"Average num of neg classes selected = {self.avg_n_neg_classes / Y.shape[0]}"
-        # )
-        # print(
-        #     pd.DataFrame(
-        #         {
-        #             "n_pos": self.pf,
-        #             "n_neg": self.nf,
-        #             "R": self.pf / self.nf,
-        #             "n_lab": Y.sum(axis=0),
-        #             "n_lab_e": Y.sum(axis=0) / Y.shape[0],
-        #             "n_nlb": Y.shape[0] - Y.sum(axis=0),
-        #             "n_nlb_e": (Y.shape[0] - Y.sum(axis=0)) / Y.shape[0],
-        #         }
-        #     )
-        # )
+        print("Counters: ")
+        for c in range(self.number_of_classes):
+            print(f"Class: {c}")
+            print(f"Positive polarity: t1a = {pos_counters[c].t1a_counter}, t1b = {pos_counters[c].t1b_counter}, t2 = {pos_counters[c].t2_counter}")
+            print(f"Negative polarity: t1a = {neg_counters[c].t1a_counter}, t1b = {neg_counters[c].t1b_counter}, t2 = {neg_counters[c].t2_counter}")
         if met:
             return {
                 "pf": self.pf,
@@ -424,3 +419,21 @@ class TMCoalesceMultiOuputClassifier(
 
     def number_of_include_actions(self, clause):
         return self.clause_bank.number_of_include_actions(clause)
+
+
+class Counter:
+    def __init__(self, class_ind, polarity) -> None:
+        self.class_ind = class_ind
+        self.polarity = polarity
+        self.t1a_counter = 0
+        self.t1b_counter = 0
+        self.t2_counter = 0
+
+    def inc_t1a(self, n):
+        self.t1a_counter += n
+
+    def inc_t1b(self, n):
+        self.t1b_counter += n
+
+    def inc_t2(self, n):
+        self.t2_counter += n
