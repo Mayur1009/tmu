@@ -114,6 +114,158 @@ class TMCoalesceMultiOuputClassifier(
         if self.max_positive_clauses is None:
             self.max_positive_clauses = self.number_of_clauses
 
+    def fit_init(self, X, Y):
+        self.init(X, Y)
+
+        # Drops clauses randomly based on clause drop probability
+        self.clause_active = (
+            self.rng.rand(self.number_of_clauses) >= self.clause_drop_p
+        ).astype(np.int32)
+
+        # Literals are dropped based on literal drop probability
+        self.literal_active = np.zeros(
+            self.clause_bank.number_of_ta_chunks, dtype=np.uint32
+        )
+        literal_active_integer = (
+            self.rng.rand(self.clause_bank.number_of_literals) >= self.literal_drop_p
+        )
+        for k in range(self.clause_bank.number_of_literals):
+            if literal_active_integer[k] == 1:
+                ta_chunk = k // 32
+                chunk_pos = k % 32
+                self.literal_active[ta_chunk] |= 1 << chunk_pos
+
+        if not self.feature_negation:
+            for k in range(
+                self.clause_bank.number_of_literals // 2,
+                self.clause_bank.number_of_literals,
+            ):
+                ta_chunk = k // 32
+                chunk_pos = k % 32
+                self.literal_active[ta_chunk] &= ~(1 << chunk_pos)
+
+        self.literal_active = self.literal_active.astype(np.uint32)
+
+        self.wcomb = np.empty(
+            (self.number_of_clauses, self.number_of_classes), dtype=np.int32
+        )
+
+    def fit_batch(self, X, Y, shuffle=True, progress_bar=False, met=False):
+        encoded_X_train = self.train_encoder_cache.get_encoded_data(
+            X, encoder_func=lambda x: self.clause_bank.prepare_X(X)
+        )
+        shuffled_index = np.arange(X.shape[0])
+        if shuffle:
+            self.rng.shuffle(shuffled_index)
+
+        pbar = tqdm(shuffled_index, leave=False) if progress_bar else shuffled_index
+
+        for c in range(self.number_of_classes):
+            self.wcomb[:, c] = self.weight_banks[c].get_weights()
+
+        # Find all 0 and 1 indices in Y
+        pos_class_ind = [np.where(i == 1)[0] for i in Y]
+        neg_class_ind = [np.where(i == 0)[0] for i in Y]
+
+        self.pf = np.zeros(self.number_of_classes)
+        self.nf = np.zeros(self.number_of_classes)
+        self.class_sums_per_sample = np.empty((X.shape[0], self.number_of_classes))
+        self.update_p_per_sample = np.empty((X.shape[0], self.number_of_classes))
+
+        for e in pbar:
+            clause_outputs = self.clause_bank.calculate_clause_outputs_update(
+                self.literal_active, encoded_X_train, e
+            )
+            class_sums = (clause_outputs * self.clause_active)[
+                np.newaxis, :
+            ] @ self.wcomb
+            class_sums = np.clip(class_sums, -self.T, self.T).astype(np.int32).ravel()
+            self.class_sums_per_sample[e, :] = class_sums
+
+            pos_ind = pos_class_ind[e]
+            neg_ind = neg_class_ind[e]
+            t = self.T * np.ones(self.number_of_classes)
+            t[neg_ind] *= -1
+            self.update_ps = (t - class_sums) / (2 * t)
+
+            self.update_p_per_sample[e, :] = self.update_ps
+
+            for c in pos_ind:
+                update_p = self.update_ps[c]
+                self.clause_bank.type_i_feedback(
+                    update_p=update_p * self.type_i_p,
+                    clause_active=self.clause_active
+                    * (self.weight_banks[c].get_weights() >= 0),
+                    literal_active=self.literal_active,
+                    encoded_X=encoded_X_train,
+                    e=e,
+                )
+                self.clause_bank.type_ii_feedback(
+                    update_p=update_p * self.type_ii_p,
+                    clause_active=self.clause_active
+                    * (self.weight_banks[c].get_weights() < 0),
+                    literal_active=self.literal_active,
+                    encoded_X=encoded_X_train,
+                    e=e,
+                )
+                if (
+                    self.weight_banks[c].get_weights() >= 0
+                ).sum() < self.max_positive_clauses:
+                    self.weight_banks[c].increment(
+                        clause_output=clause_outputs,
+                        update_p=update_p,
+                        clause_active=self.clause_active,
+                        positive_weights=True,
+                    )
+                    self.wcomb[:, c] = self.weight_banks[c].get_weights()
+
+                self.update_ps[c] = 0.0
+                self.pf[c] += 1
+
+            if np.sum(self.update_ps) == 0:
+                continue
+
+            rand_smp = self.rng.random_sample(self.number_of_classes)
+            self.rng.shuffle(neg_ind)
+
+            for c in neg_ind:
+                if rand_smp[c] <= (self.q / max(1, self.number_of_classes - 1)):
+                    update_p = self.update_ps[c]
+                    self.clause_bank.type_i_feedback(
+                        update_p=update_p * self.type_i_p,
+                        clause_active=self.clause_active
+                        * (self.weight_banks[c].get_weights() < 0),
+                        literal_active=self.literal_active,
+                        encoded_X=encoded_X_train,
+                        e=e,
+                    )
+
+                    self.clause_bank.type_ii_feedback(
+                        update_p=update_p * self.type_ii_p,
+                        clause_active=self.clause_active
+                        * (self.weight_banks[c].get_weights() >= 0),
+                        literal_active=self.literal_active,
+                        encoded_X=encoded_X_train,
+                        e=e,
+                    )
+
+                    self.weight_banks[c].decrement(
+                        clause_output=clause_outputs,
+                        update_p=update_p,
+                        clause_active=self.clause_active,
+                        negative_weights=True,
+                    )
+                    self.wcomb[:, c] = self.weight_banks[c].get_weights()
+                    self.update_ps[c] = 0.0
+                    self.nf[c] += 1
+        if met:
+            return {
+                "pf": self.pf,
+                "nf": self.nf,
+                "class_sums": self.class_sums_per_sample,
+                "update_p": self.update_p_per_sample,
+            }
+
     def fit(self, X, Y, shuffle=True, progress_bar=False, met=False, **kwargs):
         self.init(X, Y)
 

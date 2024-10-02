@@ -338,23 +338,26 @@ class ImplClauseBankCUDA(BaseClauseBank):
         super().set_ta_state(clause, ta, state)
         self._profiler.profile(cuda.memcpy_htod, self.clause_bank_gpu, self.clause_bank)
 
-    def get_literals(self):
-        result = np.zeros((self.number_of_clauses, self.number_of_literals), dtype=np.uint32)
-        result_gpu = self._profiler.profile(cuda.mem_alloc, result.nbytes)
-
-        self.get_literals.prepared_call(
-            self.grid,
-            self.block,
-            self.clause_bank_gpu,
-            self.number_of_clauses,
-            self.number_of_literals,
-            self.number_of_state_bits_ta,
-            result_gpu,
-        )
-
-        self.cuda_ctx.synchronize()
-        self._profiler.profile(cuda.memcpy_dtoh, result, result_gpu)
-        return result.astype(np.int8)
+    # FIX: Wrong logic in cuda file
+    # def get_literals(self):
+    #     self.synchronize_clause_bank()
+    #     result = np.zeros((self.number_of_clauses, self.number_of_literals), dtype=np.uint32)
+    #     result_gpu = self._profiler.profile(cuda.mem_alloc, result.nbytes)
+    #
+    #     self.get_literals_gpu.prepared_call(
+    #         self.grid,
+    #         self.block,
+    #         self.clause_bank_gpu,
+    #         self.number_of_clauses,
+    #         self.number_of_literals,
+    #         self.number_of_state_bits_ta,
+    #         result_gpu,
+    #     )
+    #
+    #     self.cuda_ctx.synchronize()
+    #     self._profiler.profile(cuda.memcpy_dtoh, result, result_gpu)
+    #     result_gpu.free()
+    #     return result.astype(np.int8)
 
     def prepare_X(self, X):
         encoded_X = tmu.tools.encode(
