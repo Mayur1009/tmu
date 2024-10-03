@@ -31,7 +31,7 @@ import numpy as np
 import logging
 import pathlib
 import tempfile
-
+import os
 from tmu.util.cuda_profiler import CudaProfiler
 
 current_dir = pathlib.Path(__file__).parent
@@ -40,11 +40,23 @@ _LOGGER = logging.getLogger(__name__)
 try:
     from pycuda._driver import Device, Context
     import pycuda.driver as cuda
-    # import pycuda.autoinit
-    cuda.init()
-    pycuda_ctx = cuda.Device(0).retain_primary_context()
+    import pycuda.autoinit
+    import pycuda
     import pycuda.curandom as curandom
     import pycuda.compiler as compiler
+    cuda.init()
+    devn = os.environ.get("CUDA_DEVICE")
+    if devn is not None:
+        try:
+            devn = int(devn)
+        except TypeError:
+            raise TypeError(
+                "CUDA device number (CUDA_DEVICE)"
+                    " must be an integer"
+            )
+    else:
+        devn = 0
+    pycuda_ctx = cuda.Device(devn).retain_primary_context()
 
     cuda_installed = True
 except Exception as e:
