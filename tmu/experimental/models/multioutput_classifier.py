@@ -453,7 +453,7 @@ class TMCoalesceMultiOuputClassifier(
         shuffled_index = np.arange(X.shape[0])
         if shuffle:
             self.rng.shuffle(shuffled_index)
-        pbar = tqdm(shuffled_index) if progress_bar else shuffled_index
+        pbar = tqdm(shuffled_index, leave=False) if progress_bar else shuffled_index
 
         # Compute class sums for all samples
         class_sums = np.empty((X.shape[0], self.number_of_classes))

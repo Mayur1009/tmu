@@ -40,7 +40,9 @@ _LOGGER = logging.getLogger(__name__)
 try:
     from pycuda._driver import Device, Context
     import pycuda.driver as cuda
-    import pycuda.autoinit
+    # import pycuda.autoinit
+    cuda.init()
+    pycuda_ctx = cuda.Device(0).retain_primary_context()
     import pycuda.curandom as curandom
     import pycuda.compiler as compiler
 
@@ -101,7 +103,8 @@ class ImplClauseBankCUDA(BaseClauseBank):
         )
 
         self.rng_gen = curandom.XORWOWRandomNumberGenerator()
-        self.cuda_ctx: Context = pycuda.autoinit.context
+        # self.cuda_ctx: Context = pycuda.autoinit.context
+        self.cuda_ctx: Context = pycuda_ctx
 
         self._profiler: CudaProfiler = CudaProfiler()
 
