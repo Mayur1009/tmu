@@ -58,6 +58,7 @@ class ClauseBank(BaseClauseBank):
         self.incremental = incremental
 
         self.clause_output = np.empty(self.number_of_clauses, dtype=np.uint32, order="c")
+        self.patch_inds = -1 * np.ones(self.number_of_clauses, dtype=np.int32, order="C")
         self.clause_output_batch = np.empty(self.number_of_clauses * batch_size, dtype=np.uint32, order="c")
         self.clause_and_target = np.zeros(self.number_of_clauses * self.number_of_ta_chunks, dtype=np.uint32, order="c")
         self.clause_output_patchwise = np.empty(self.number_of_clauses * self.number_of_patches, dtype=np.uint32, order="c")
@@ -104,6 +105,7 @@ class ClauseBank(BaseClauseBank):
 
     def _cffi_init(self):
         self.co_p = ffi.cast("unsigned int *", self.clause_output.ctypes.data)  # clause_output
+        self.ptr_patch_inds = ffi.cast("int *", self.patch_inds.ctypes.data)
         self.cob_p = ffi.cast("unsigned int *", self.clause_output_batch.ctypes.data)  # clause_output_batch
         self.ptr_clause_and_target = ffi.cast("unsigned int *", self.clause_and_target.ctypes.data)  # clause_and_target
         self.cop_p = ffi.cast("unsigned int *", self.clause_output_patchwise.ctypes.data)  # clause_output_patchwise
@@ -200,7 +202,7 @@ class ClauseBank(BaseClauseBank):
 
         return self.clause_output_batch.reshape((self.batch_size, self.number_of_clauses))[e % self.batch_size, :]
 
-    def calculate_clause_outputs_update(self, literal_active, encoded_X, e):
+    def calculate_clause_outputs_update(self, literal_active, encoded_X, e, return_patch_inds=False):
         xi_p = ffi.cast("unsigned int *", encoded_X[e, :].ctypes.data)
         la_p = ffi.cast("unsigned int *", literal_active.ctypes.data)
 
@@ -212,10 +214,14 @@ class ClauseBank(BaseClauseBank):
             self.number_of_patches,
             self.co_p,
             la_p,
-            xi_p
+            xi_p,
+            self.ptr_patch_inds
         )
 
-        return self.clause_output
+        if return_patch_inds:
+            return self.clause_output, self.patch_inds
+        else:
+            return self.clause_output
 
     def calculate_clause_outputs_patchwise(self, encoded_X, e):
         xi_p = ffi.cast("unsigned int *", encoded_X[e, :].ctypes.data)

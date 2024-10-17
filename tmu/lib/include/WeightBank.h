@@ -20,25 +20,17 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-This code implements the Convolutional Tsetlin Machine from paper arXiv:1905.09688
-https://arxiv.org/abs/1905.09688
+This code implements the Convolutional Tsetlin Machine from paper
+arXiv:1905.09688 https://arxiv.org/abs/1905.09688
 
 */
 
-void wb_increment(
-    int *clause_weights,
-    int number_of_clauses,
-    unsigned int *clause_output,
-    float update_p,
-    unsigned int *clause_active,
-    unsigned int positive_weights
-);
+void wb_increment(int *clause_weights, int number_of_clauses,
+                  unsigned int *clause_output, float update_p,
+                  unsigned int *clause_active, unsigned int positive_weights,
+                  int *patch_weights, int number_of_patches, int *patch_inds);
 
-void wb_decrement(
-    int *clause_weights,
-    int number_of_clauses,
-    unsigned int *clause_output,
-    float update_p,
-    unsigned int *clause_active,
-    unsigned int negative_weights
-);
+void wb_decrement(int *clause_weights, int number_of_clauses,
+                  unsigned int *clause_output, float update_p,
+                  unsigned int *clause_active, unsigned int negative_weights,
+                  int *patch_weights, int number_of_patches, int *patch_inds);

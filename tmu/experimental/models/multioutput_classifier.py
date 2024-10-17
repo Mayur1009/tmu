@@ -97,12 +97,20 @@ class TMCoalesceMultiOuputClassifier(
         self.number_of_classes = Y.shape[1]
         if self.q < 0:
             self.q = max(1, self.number_of_classes - 1) / 2
+        w = self.rng.choice([-1, 1], size=self.number_of_clauses).astype(np.int32)
+        pw = np.zeros(
+            (self.number_of_clauses, self.clause_bank.number_of_patches),
+            dtype=np.int32,
+        )
+
+        # for p_num in range(self.clause_bank.number_of_patches):
+        #     pw[:, p_num] = w
+
         self.weight_banks.set_clause_init(
             WeightBank,
             dict(
-                weights=self.rng.choice([-1, 1], size=self.number_of_clauses).astype(
-                    np.int32
-                )
+                weights=w,
+                patch_weights=pw,
             ),
         )
         self.weight_banks.populate(list(range(self.number_of_classes)))
@@ -173,12 +181,15 @@ class TMCoalesceMultiOuputClassifier(
         self.update_p_per_sample = np.empty((X.shape[0], self.number_of_classes))
 
         for e in pbar:
-            clause_outputs = self.clause_bank.calculate_clause_outputs_update(
-                self.literal_active, encoded_X_train, e
+            clause_outputs, patch_inds = (
+                self.clause_bank.calculate_clause_outputs_update(
+                    self.literal_active, encoded_X_train, e, return_patch_inds=True
+                )
             )
-            class_sums = (clause_outputs * self.clause_active)[
-                np.newaxis, :
-            ] @ self.wcomb
+            class_sums = (
+                np.array(clause_outputs * self.clause_active)[np.newaxis, :]
+                @ self.wcomb
+            )
             class_sums = np.clip(class_sums, -self.T, self.T).astype(np.int32).ravel()
             self.class_sums_per_sample[e, :] = class_sums
 
@@ -216,6 +227,7 @@ class TMCoalesceMultiOuputClassifier(
                         update_p=update_p,
                         clause_active=self.clause_active,
                         positive_weights=True,
+                        patch_inds=patch_inds,
                     )
                     self.wcomb[:, c] = self.weight_banks[c].get_weights()
 
@@ -254,6 +266,7 @@ class TMCoalesceMultiOuputClassifier(
                         update_p=update_p,
                         clause_active=self.clause_active,
                         negative_weights=True,
+                        patch_inds=patch_inds,
                     )
                     self.wcomb[:, c] = self.weight_banks[c].get_weights()
                     self.update_ps[c] = 0.0

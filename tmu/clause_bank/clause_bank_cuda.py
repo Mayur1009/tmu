@@ -117,7 +117,7 @@ class ImplClauseBankCUDA(BaseClauseBank):
 
         mod = load_cuda_kernel(parameters, "cuda/calculate_clause_outputs_update.cu")
         self.calculate_clause_outputs_update_gpu = mod.get_function("calculate_clause_outputs_update")
-        self.calculate_clause_outputs_update_gpu.prepare("PiiiPPPi")
+        self.calculate_clause_outputs_update_gpu.prepare("PiiiPPPiP")
 
         mod = load_cuda_kernel(parameters, "cuda/calculate_clause_outputs_patchwise.cu")
         self.calculate_clause_outputs_patchwise_gpu = mod.get_function("calculate_clause_outputs_patchwise")
@@ -148,6 +148,9 @@ class ImplClauseBankCUDA(BaseClauseBank):
             order="c"
         )
         self.clause_output_gpu = self._profiler.profile(cuda.mem_alloc, self.clause_output.nbytes)
+
+        self.patch_inds = -1 * np.ones(int(self.number_of_clauses), dtype=np.int32, order="C")
+        self.patch_inds_gpu = self._profiler.profile(cuda.mem_alloc, self.patch_inds.nbytes)
 
         self.clause_output_patchwise = np.empty(
             int(self.number_of_clauses * self.number_of_patches),
@@ -206,7 +209,7 @@ class ImplClauseBankCUDA(BaseClauseBank):
         self._profiler.profile(cuda.memcpy_dtoh, self.clause_output, self.clause_output_gpu)
         return self.clause_output
 
-    def calculate_clause_outputs_update(self, literal_active, encoded_X, e):
+    def calculate_clause_outputs_update(self, literal_active, encoded_X, e, return_patch_inds=False):
         self._profiler.profile(cuda.memcpy_htod, self.literal_active_gpu, literal_active)
 
         self.calculate_clause_outputs_update_gpu.prepared_call(
@@ -219,12 +222,17 @@ class ImplClauseBankCUDA(BaseClauseBank):
             self.clause_output_gpu,
             self.literal_active_gpu,
             encoded_X,
-            np.int32(e)
+            np.int32(e),
+            self.patch_inds_gpu
         )
 
         self.cuda_ctx.synchronize()
         self._profiler.profile(cuda.memcpy_dtoh, self.clause_output, self.clause_output_gpu)
-        return self.clause_output
+        self._profiler.profile(cuda.memcpy_dtoh, self.patch_inds, self.patch_inds_gpu)
+        if return_patch_inds:
+            return self.clause_output, self.patch_inds
+        else:
+            return self.clause_output
 
     def calculate_clause_outputs_patchwise(self, encoded_X, e):
 

@@ -20,46 +20,43 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-This code implements the Convolutional Tsetlin Machine from paper arXiv:1905.09688
-https://arxiv.org/abs/1905.09688
+This code implements the Convolutional Tsetlin Machine from paper
+arXiv:1905.09688 https://arxiv.org/abs/1905.09688
 
 */
 
-#include <stdio.h>
-#include <stdlib.h>
 #include <limits.h>
 #include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+
 #include "fast_rand.h"
 
-void wb_increment(
-        int *clause_weights,
-        int number_of_clauses,
-        unsigned int *clause_output,
-        float update_p,
-        unsigned int *clause_active,
-        unsigned int positive_weights
-)
-{
-	for (int j = 0; j < number_of_clauses; ++j) {
-		if (clause_active[j] && clause_output[j] && (positive_weights || (clause_weights[j] != -1)) && (((float)fast_rand())/((float)FAST_RAND_MAX) <= update_p)) {
-			clause_weights[j]++;
-		}
-	}
+void wb_increment(int *clause_weights, int number_of_clauses,
+                  unsigned int *clause_output, float update_p,
+                  unsigned int *clause_active, unsigned int positive_weights,
+                  int *patch_weights, int number_of_patches, int *patch_inds) {
+    for (int j = 0; j < number_of_clauses; ++j) {
+        if (clause_active[j] && clause_output[j] &&
+            (positive_weights || (clause_weights[j] != -1)) &&
+            (((float)fast_rand()) / ((float)FAST_RAND_MAX) <= update_p)) {
+            clause_weights[j]++;
+            patch_weights[number_of_patches * j + patch_inds[j]]++;
+        }
+    }
 }
 
-void wb_decrement(
-        int *clause_weights,
-        int number_of_clauses,
-        unsigned int *clause_output,
-        float update_p,
-        unsigned int *clause_active,
-        unsigned int negative_weights
-)
-{
-	for (int j = 0; j < number_of_clauses; j++) {
-		if (clause_active[j] && clause_output[j] && (negative_weights || (clause_weights[j] != 1)) && (((float)fast_rand())/((float)FAST_RAND_MAX) <= update_p)) {
-			clause_weights[j]--;
-		}
-	}
+void wb_decrement(int *clause_weights, int number_of_clauses,
+                  unsigned int *clause_output, float update_p,
+                  unsigned int *clause_active, unsigned int negative_weights,
+                  int *patch_weights, int number_of_patches, int *patch_inds) {
+    for (int j = 0; j < number_of_clauses; j++) {
+        if (clause_active[j] && clause_output[j] &&
+            (negative_weights || (clause_weights[j] != 1)) &&
+            (((float)fast_rand()) / ((float)FAST_RAND_MAX) <= update_p)) {
+            clause_weights[j]--;
+            patch_weights[number_of_patches * j + patch_inds[j]]--;
+        }
+    }
 }

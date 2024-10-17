@@ -92,7 +92,8 @@ void cb_calculate_clause_outputs_update(
     int number_of_patches,
     unsigned int *clause_output,
     unsigned int *literal_active,
-    unsigned int *Xi
+    unsigned int *Xi,
+    int *patch_inds
 );
 
 void cb_calculate_clause_outputs_patchwise(

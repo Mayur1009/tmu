@@ -27,26 +27,65 @@ import numpy as np
 
 
 class WeightBank(CFFISerializable):
-
-    def __init__(self, weights: np.ndarray, copy: bool = True):
+    def __init__(
+        self, weights: np.ndarray, patch_weights: np.ndarray, copy: bool = True
+    ):
         self.number_of_clauses = weights.shape[0]
         self.weights = weights.copy(order="C") if copy else weights
-        
-        
+        self.number_of_patches = patch_weights.shape[1]
+        self.patch_weights = (
+            patch_weights.reshape(
+                (self.number_of_clauses * self.number_of_patches)
+            ).copy(order="C")
+            if copy
+            else patch_weights.reshape(
+                (self.number_of_clauses * self.number_of_patches)
+            )
+        )
         self._cffi_init()
 
     def _cffi_init(self):
         self.cw_p = ffi.cast("int *", self.weights.ctypes.data)
+        self.pw_p = ffi.cast("int *", self.patch_weights.ctypes.data)
 
-    def increment(self, clause_output, update_p, clause_active, positive_weights):
+    def increment(
+        self, clause_output, update_p, clause_active, positive_weights, patch_inds
+    ):
         co_p = ffi.cast("unsigned int *", clause_output.ctypes.data)
         ca_p = ffi.cast("unsigned int *", clause_active.ctypes.data)
-        lib.wb_increment(self.cw_p, self.number_of_clauses, co_p, update_p, ca_p, int(positive_weights))
+        pi_p = ffi.cast("int *", patch_inds.ctypes.data)
+        lib.wb_increment(
+            self.cw_p,
+            self.number_of_clauses,
+            co_p,
+            update_p,
+            ca_p,
+            int(positive_weights),
+            self.pw_p,
+            self.number_of_patches,
+            pi_p,
+        )
 
-    def decrement(self, clause_output, update_p, clause_active, negative_weights):
+    def decrement(
+        self, clause_output, update_p, clause_active, negative_weights, patch_inds
+    ):
         co_p = ffi.cast("unsigned int *", clause_output.ctypes.data)
         ca_p = ffi.cast("unsigned int *", clause_active.ctypes.data)
-        lib.wb_decrement(self.cw_p, self.number_of_clauses, co_p, update_p, ca_p, int(negative_weights))
+        pi_p = ffi.cast("int *", patch_inds.ctypes.data)
+        lib.wb_decrement(
+            self.cw_p,
+            self.number_of_clauses,
+            co_p,
+            update_p,
+            ca_p,
+            int(negative_weights),
+            self.pw_p,
+            self.number_of_patches,
+            pi_p,
+        )
 
     def get_weights(self):
         return self.weights
+
+    def get_patch_weights(self):
+        return self.patch_weights.reshape((self.number_of_clauses, self.number_of_patches))
