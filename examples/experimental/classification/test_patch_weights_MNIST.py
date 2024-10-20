@@ -109,8 +109,8 @@ if __name__ == "__main__":
 
     literals = tm.clause_bank.get_literals()
 
-    ppolarity = np.zeros((10, 2, 28, 28))
-    npolarity = np.zeros((10, 2, 28, 28))
+    ppolarity = np.zeros((10, 3, 28, 28))
+    npolarity = np.zeros((10, 3, 28, 28))
 
     for c in range(num_classes):
         weights = tm.weight_banks[c].get_weights()
@@ -120,15 +120,9 @@ if __name__ == "__main__":
             pos_lit = literals[clause_ind, 18 + 18 : 18 + 18 + 100].reshape((10, 10))
             neg_lit = literals[clause_ind, 18 + 18 + 100 + 18 + 18 :].reshape((10, 10))
 
-            pimg = np.zeros((2, 28, 28))
-            nimg = np.zeros((2, 28, 28))
+            pimg = np.zeros((3, 28, 28))
+            nimg = np.zeros((3, 28, 28))
             pws = patch_weights[clause_ind]
-
-            # print(f"{pws=}")
-            # print(f"{pws.mean()=}")
-            # print(f"{pws.max()=}")
-            # print(f"{pws.min()=}")
-            # print(f"{np.median(pws)=}")
             pws = pws.reshape(19, 19)
 
             for m in range(19):
@@ -136,20 +130,24 @@ if __name__ == "__main__":
                     if weights[clause_ind] > 0:
                         pimg[0, m : m + 10, n : n + 10] += pos_lit * pws[m, n]
                         pimg[1, m : m + 10, n : n + 10] += neg_lit * pws[m, n]
+                        pimg[2, m : m + 10, n : n + 10] += (pos_lit - neg_lit) * pws[
+                            m, n
+                        ]
                     else:
                         # Negative polarity case
                         nimg[0, m : m + 10, n : n + 10] += pos_lit * pws[m, n]
                         nimg[1, m : m + 10, n : n + 10] += neg_lit * pws[m, n]
-
-            # pimg[0] += scale(pimg[0], 0, 1)
-            # pimg[1] += scale(pimg[1], 0, 1)
-            # nimg[0] += scale(nimg[0], 0, 1)
-            # nimg[1] += scale(nimg[1], 0, 1)
+                        nimg[2, m : m + 10, n : n + 10] += (pos_lit - neg_lit) * pws[
+                            m, n
+                        ]
 
             ppolarity[c, 0] = ppolarity[c, 0] + (pimg[0] - ppolarity[c, 0]) / (
                 num_clauses + 1
             )
             ppolarity[c, 1] = ppolarity[c, 1] + (pimg[1] - ppolarity[c, 1]) / (
+                num_clauses + 1
+            )
+            ppolarity[c, 2] = ppolarity[c, 2] + (pimg[2] - ppolarity[c, 2]) / (
                 num_clauses + 1
             )
             npolarity[c, 0] = npolarity[c, 0] + (nimg[0] - npolarity[c, 0]) / (
@@ -158,11 +156,21 @@ if __name__ == "__main__":
             npolarity[c, 1] = npolarity[c, 1] + (nimg[1] - npolarity[c, 1]) / (
                 num_clauses + 1
             )
+            npolarity[c, 2] = npolarity[c, 2] + (pimg[2] - npolarity[c, 2]) / (
+                num_clauses + 1
+            )
 
     for c in range(num_classes):
-        fig, axs = plt.subplots(2, 2, squeeze=False)
+        fig, axs = plt.subplots(
+            2, 3, squeeze=False, figsize=(7, 7), layout="compressed"
+        )
+        for x in axs.ravel():
+            x.axis("off")
         axs[0, 0].imshow(scale(ppolarity[c, 0], 0, 1))
         axs[0, 1].imshow(scale(ppolarity[c, 1], 0, 1))
+        axs[0, 2].imshow(scale(ppolarity[c, 2], 0, 1))
         axs[1, 0].imshow(scale(npolarity[c, 0], 0, 1))
         axs[1, 1].imshow(scale(npolarity[c, 1], 0, 1))
-        fig.savefig(f"~/class_{c}.png", bbox_inches="tight")
+        axs[1, 2].imshow(scale(npolarity[c, 2], 0, 1))
+        # fig.savefig(f"~/class_{c}.png", bbox_inches="tight")
+    plt.show()

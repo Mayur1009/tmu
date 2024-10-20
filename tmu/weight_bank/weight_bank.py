@@ -88,4 +88,6 @@ class WeightBank(CFFISerializable):
         return self.weights
 
     def get_patch_weights(self):
-        return self.patch_weights.reshape((self.number_of_clauses, self.number_of_patches))
+        return self.patch_weights.reshape(
+            (self.number_of_clauses, self.number_of_patches)
+        )

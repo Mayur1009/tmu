@@ -56,7 +56,7 @@ void wb_decrement(int *clause_weights, int number_of_clauses,
             (negative_weights || (clause_weights[j] != 1)) &&
             (((float)fast_rand()) / ((float)FAST_RAND_MAX) <= update_p)) {
             clause_weights[j]--;
-            patch_weights[number_of_patches * j + patch_inds[j]]--;
+            patch_weights[number_of_patches * j + patch_inds[j]]++;
         }
     }
 }
